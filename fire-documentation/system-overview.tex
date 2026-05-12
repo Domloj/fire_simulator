@@ -1,0 +1,340 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{amsmath}
+
+\geometry{margin=2.5cm}
+
+\title{System Overview \& Architecture}
+\author{Fire Simulation System}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\newpage
+
+\section{Wprowadzenie}
+
+\subsection{Cel dokumentu}
+
+Dokument zawiera opis architektury systemu symulacji pożarów lasu, jego składników, przepływu danych oraz sposobu uruchomienia całego systemu.
+\subsection{Zakres dokumentu}
+
+\section{Architektura systemu}
+
+\subsection{Przegląd architektury}
+
+System symulacji pożarów lasu zbudowany jest w architekturze mikroserwisów, składającej się z czterech głównych modułów oraz infrastruktury wspierającej:
+
+\begin{itemize}
+    \item \textbf{FFBackend} (fire-backend) -- serwis Java/Spring Boot odpowiedzialny za logikę biznesową i koordynację
+    \item \textbf{FFSim} (fire-simulation) -- silnik symulacji napisany w Pythonie
+    \item \textbf{FFSup} (fire-support) -- serwis wsparcia decyzyjnego wykorzystujący MCTS
+    \item \textbf{FFVis} (fire-visualization) -- aplikacja frontendowa do wizualizacji
+    \item \textbf{FFConf} (fire-configurations) -- serwis zarządzania konfiguracjami lasu
+\end{itemize}
+
+
+\subsection{Technologie i narzędzia}
+
+\begin{itemize}
+    \item \textbf{Backend:} Java 17, Spring Boot, Maven
+    \item \textbf{Symulacja:} Python 3.x, asyncio
+    \item \textbf{Frontend:} TypeScript, React, MapLibre GL
+    \item \textbf{Komunikacja:} RabbitMQ (topic exchange), HTTP/REST, Server-Sent Events (SSE)
+    \item \textbf{Baza danych:} MongoDB
+    \item \textbf{Orchestracja:} Docker, Docker Compose
+    \item \textbf{Logowanie:} Grafana, Loki, Promtail (w trakcie implementacji)
+\end{itemize}
+
+\section{Komponenty systemu}
+
+\subsection{FFBackend (fire-backend)}
+
+\subsubsection{Odpowiedzialności}
+
+\begin{itemize}
+    \item Zarządzanie stanem symulacji (sektory, brygady, patrole)
+    \item Agregacja danych z symulacji
+    \item Udostępnianie REST API dla frontendu
+    \item Strumieniowanie stanu symulacji przez SSE
+    \item Przekazywanie komend z frontendu do symulacji
+    \item Publikowanie zagregowanych danych do serwisu wsparcia
+\end{itemize}
+
+
+\subsubsection{Zależności}
+
+\begin{itemize}
+    \item Wymaga: RabbitMQ, MongoDB (opcjonalnie)
+    \item Komunikuje się z: FFSim (HTTP + RabbitMQ), FFSup (RabbitMQ), FFVis (HTTP/SSE)
+    \item Port: 8181 (domyślnie)
+\end{itemize}
+
+\subsection{FFSim (fire-simulation)}
+
+\subsubsection{Odpowiedzialności}
+
+\begin{itemize}
+    \item Wykonanie symulacji fizycznej pożaru lasu
+    \item Modelowanie rozprzestrzeniania się ognia
+    \item Zarządzanie agentami (brygady pożarnicze, patrole leśne)
+    \item Aktualizacja stanu sektorów (poziom ognia, spalenia, gaszenia)
+    \item Publikowanie danych telemetrycznych (czujniki, agenci, sektory)
+    \item Odbieranie komend sterujących od backendu
+\end{itemize}
+
+
+\subsubsection{Zależności}
+
+\begin{itemize}
+    \item Wymaga: RabbitMQ
+    \item Komunikuje się z: FFBackend (HTTP + RabbitMQ)
+    \item Port: 5000 (domyślnie)
+\end{itemize}
+
+\subsubsection{Ważna uwaga}
+
+Symulator jest osobnym bytem w systemie. Wszystkie decyzje podejmowane są przez system (FFBackend, FFSup), a symulator jedynie wykonuje komendy i symuluje fizykę pożaru.
+
+\subsection{FFSup (fire-support)}
+
+\subsubsection{Odpowiedzialności}
+
+\begin{itemize}
+    \item Generowanie rekomendacji decyzyjnych przy użyciu MCTS
+    \item Analiza stanu symulacji
+    \item Publikowanie rekomendacji do backendu/frontendu
+    \item Zarządzanie pulą workerów MCTS
+    \item Konwersja stanu symulacji do formatu wymaganego przez algorytmy
+\end{itemize}
+
+\subsubsection{Zależności}
+
+\begin{itemize}
+    \item Wymaga: RabbitMQ
+    \item Komunikuje się z: FFBackend (RabbitMQ)
+    \item Port: brak (tylko RabbitMQ)
+\end{itemize}
+
+\subsection{FFVis (fire-visualization)}
+
+\subsubsection{Odpowiedzialności}
+
+\begin{itemize}
+    \item Wizualizacja mapy lasu i sektorów
+    \item Wyświetlanie pozycji brygad i patroli
+    \item Prezentacja rekomendacji decyzyjnych
+    \item Interakcja użytkownika (wysyłanie komend)
+    \item Wyświetlanie danych z czujników
+\end{itemize}
+
+\subsubsection{Zależności}
+
+\begin{itemize}
+    \item Wymaga: FFBackend (HTTP/SSE)
+    \item Port: 8080 (domyślnie)
+\end{itemize}
+
+\subsection{FFConf (fire-configurations)}
+
+\subsubsection{Odpowiedzialności}
+
+\begin{itemize}
+    \item Zarządzanie konfiguracjami lasu w MongoDB
+    \item Udostępnianie API do CRUD konfiguracji
+    \item Walidacja konfiguracji JSON
+    \item Przechowywanie hierarchicznej struktury konfiguracji
+\end{itemize}
+
+
+\subsubsection{Zależności}
+
+\begin{itemize}
+    \item Wymaga: MongoDB
+    \item Port: 31415 (domyślnie)
+\end{itemize}
+
+\section{Komunikacja między modułami}
+
+\subsection{Protokoły komunikacji}
+
+\subsubsection{HTTP/REST}
+
+Używany do:
+\begin{itemize}
+    \item Komunikacji FFVis $\leftrightarrow$ FFBackend
+    \item Komunikacji FFBackend $\leftrightarrow$ FFSim (komendy, konfiguracja)
+    \item Komunikacji FFVis $\leftrightarrow$ FFConf (pobieranie konfiguracji)
+\end{itemize}
+
+\subsubsection{RabbitMQ (Topic Exchange)}
+
+Używany do:
+\begin{itemize}
+    \item Publikacji danych telemetrycznych z FFSim do FFBackend
+    \item Publikacji zagregowanych danych z FFBackend do FFSup
+    \item Publikacji rekomendacji z FFSup do FFBackend
+    \item Kolejkowania komend gdy FFSim jest niedostępny
+\end{itemize}
+
+\subsubsection{Server-Sent Events (SSE)}
+
+Używany do:
+\begin{itemize}
+    \item Strumieniowania stanu symulacji z FFBackend do FFVis
+    \item Jednokierunkowa komunikacja w czasie rzeczywistym
+\end{itemize}
+
+\subsection{Exchange RabbitMQ}
+
+Wszystkie kolejki używają exchange typu \texttt{topic} o nazwie \texttt{fire-simulation-exchange} (konfigurowalne przez zmienną środowiskową \texttt{RABBITMQ\_EXCHANGE}).
+
+\section{Uruchomienie systemu}
+
+\subsection{Wymagania}
+
+\begin{itemize}
+    \item Docker i Docker Compose
+    \item Minimum 4GB RAM
+    \item Porty: 8080, 8181, 5000, 31415, 27017, 5672, 15672
+\end{itemize}
+
+\subsection{Uruchomienie przez Docker Compose}
+
+\subsubsection{Uruchomienie wszystkich serwisów}
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+docker compose -f docker-compose.yml up --build
+\end{lstlisting}
+
+\subsubsection{Uruchomienie wybranych serwisów}
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+# Najpierw infrastruktura
+docker compose up --build rabbitmq-service mongo
+
+# Następnie serwisy aplikacyjne
+docker compose up --build fire-backend-service
+docker compose up --build fire-simulation-service
+docker compose up --build fire-configuration-service
+docker compose up --build fire-visualization-service
+\end{lstlisting}
+
+\subsection{Kolejność uruchamiania}
+
+Zalecana kolejność uruchamiania serwisów:
+
+\begin{enumerate}
+    \item \textbf{MongoDB} -- baza danych dla konfiguracji
+    \item \textbf{RabbitMQ} -- broker komunikatów
+    \item \textbf{FFConf} -- serwis konfiguracji (wymaga MongoDB)
+    \item \textbf{FFBackend} -- backend (wymaga RabbitMQ, opcjonalnie MongoDB)
+    \item \textbf{FFSim} -- symulator (wymaga RabbitMQ)
+    \item \textbf{FFSup} -- serwis wsparcia (wymaga RabbitMQ)
+    \item \textbf{FFVis} -- frontend (wymaga FFBackend)
+\end{enumerate}
+
+\subsection{Sprawdzanie statusu}
+
+\begin{itemize}
+    \item \textbf{FFBackend:} \texttt{http://localhost:8181/actuator/health}
+    \item \textbf{FFConf:} \texttt{http://localhost:31415/health}
+    \item \textbf{RabbitMQ Management:} \texttt{http://localhost:15672}
+    \item \textbf{FFVis:} \texttt{http://localhost:8080}
+\end{itemize}
+
+\section{Architektura agentowa}
+
+\subsection{Model agentów}
+
+System wykorzystuje architekturę agentową, gdzie agenci reprezentują autonomiczne jednostki działające w symulacji.
+
+\subsubsection{Definicja agenta}
+
+Agent w systemie to:
+\begin{itemize}
+    \item \textbf{Instancja runtime:} obiekt w pamięci reprezentujący jednostkę (brygada pożarnicza, patrol leśny)
+    \item \textbf{Cykl życia:} inicjalizacja $\rightarrow$ decyzja $\rightarrow$ akcja $\rightarrow$ raport
+    \item \textbf{Miejsce w architekturze:} agenci "żyją" w FFSim, ale są zarządzani przez FFBackend
+\end{itemize}
+
+\subsubsection{Typy agentów}
+
+\begin{itemize}
+    \item \textbf{FireBrigade} -- brygada pożarnicza
+    \begin{itemize}
+        \item Stany: AVAILABLE, TRAVELLING, EXTINGUISHING
+        \item Zadania: gaszenie pożarów w sektorach
+        \item Decyzje: wybór sektora do gaszenia (może być LLM-driven)
+    \end{itemize}
+    
+    \item \textbf{ForesterPatrol} -- patrol leśny
+    \begin{itemize}
+        \item Stany: AVAILABLE, TRAVELLING, PATROLLING
+        \item Zadania: patrolowanie sektorów, wykrywanie zagrożeń
+        \item Decyzje: wybór sektora do patrolowania (heurystyka, może być LLM-driven)
+    \end{itemize}
+\end{itemize}
+
+\subsection{Separacja logiki decyzyjnej}
+
+\textbf{Ważne:} Agent jest oddzielony od logiki decyzyjnej. Logika decyzyjna może być:
+\begin{itemize}
+    \item Deterministyczna (reguły, heurystyki)
+    \item MCTS (Monte Carlo Tree Search)
+    \item LLM-driven (wymienna strategia decyzyjna)
+\end{itemize}
+
+LLM jest traktowany jako \textbf{jedna z implementacji} modułu decyzyjnego.
+
+\section{Logi systemu}
+
+\subsection{Struktura logów}
+
+Wszystkie serwisy logują do plików w katalogu \texttt{logs/}:
+\begin{itemize}
+    \item \texttt{logs/fire-backend/application.log}
+    \item \texttt{logs/fire-simulation/application.log}
+    \item \texttt{logs/fire-configuration/application.log}
+\end{itemize}
+
+\section{Wersjonowanie i kompatybilność}
+
+\subsection{Wersjonowanie komunikatów}
+
+Obecnie system nie implementuje formalnego wersjonowania komunikatów. Zalecane jest dodanie wersji do:
+\begin{itemize}
+    \item Kontraktów RabbitMQ (pole \texttt{version} w nagłówkach)
+    \item REST API (prefiks \texttt{/api/v1/})
+    \item Formatów JSON konfiguracji
+\end{itemize}
+
+\section{Ograniczenia systemu}
+
+\subsection{System alertów}
+
+System \textbf{nie posiada} mechanizmu alertów w czasie rzeczywistym. W przyszłości można dodać koncepcyjny mechanizm alertów jako osobny moduł.
+
+\subsection{Charakter symulacyjny}
+
+Wszystkie dane w systemie są generowane przez symulator. System nie korzysta z:
+\begin{itemize}
+    \item Realnych czujników środowiskowych
+    \item Realnych danych meteorologicznych (oprócz symulowanego wiatru)
+    \item Realnych jednostek pożarniczych
+\end{itemize}
+
+\section{Podsumowanie}
+
+System symulacji pożarów lasu jest zbudowany w architekturze mikroserwisów z wyraźnym podziałem odpowiedzialności. 
+
+\end{document}

@@ -1,0 +1,252 @@
+volumes:
+  mongo-data:
+    driver: local
+  grafana-data:
+    driver: local
+  loki-data:
+    driver: local
+  promtail-positions:
+    driver: local
+  sonar-data: {}
+  sonar-extensions: {}
+  sonar-logs: {}
+  sonar-postgres: {}
+
+
+name: "fire-protection"
+networks:
+  fire-network:
+    driver: bridge
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    volumes:
+      - mongo-data:/data/db
+      - ./logs/mongo:/var/log
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - ./fire-configurations/.env
+    environment:
+      MONGO_INITDB_DATABASE: configurations
+    networks:
+      - fire-network
+
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    container_name: rabbitmq
+    env_file:
+      - ./fire-configurations/.env
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fire-network
+
+  simulation:
+    build:
+      context: fire-simulation
+      dockerfile: Dockerfile
+    container_name: simulation
+    volumes:
+      - ./logs/fire-simulation:/var/log/fire-simulation
+    env_file:
+      - ./fire-simulation/.env
+    environment:
+      - LOG_FILE=/var/log/fire-simulation/application.log
+    ports:
+      - "${SIMULATOR_PORT:-5000}:5000"
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+    networks:
+      - fire-network
+
+  backend:
+    build:
+      context: fire-backend
+      dockerfile: Dockerfile
+      cache_from:
+        - fire-backend:latest
+    container_name: backend
+    volumes:
+      - ./logs/fire-backend:/var/log/fire-backend
+    image: fire-backend:latest
+    env_file:
+      - ./fire-backend/.env
+    environment:
+      - LOG_FILE=/var/log/fire-backend/application.log
+    ports:
+      - "${BACKEND_PORT:-8181}:8181"
+    restart: always
+    depends_on:
+      - mongo
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fire-network
+
+  configuration:
+    build:
+      context: fire-configurations
+      dockerfile: Dockerfile
+    container_name: configuration
+    volumes:
+      - ./logs/fire-configuration:/var/log/fire-configuration
+    ports:
+      - "${CONFIG_PORT:-31415}:31415"
+    env_file:
+      - ./fire-configurations/.env
+    environment:
+      - MONGO_CONNECTION=mongodb://mongo:27017/configurations
+      - LOG_DIR=/var/log/fire-configuration
+    depends_on:
+      - mongo
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:31415/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fire-network
+
+  visualization:
+    build:
+      context: fire-visualization
+      dockerfile: Dockerfile
+    container_name: visualization
+    volumes:
+      - ./logs/fire-visualization:/var/log/fire-visualization
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./fire-visualization/.env
+    environment:
+      - NODE_ENV=development
+      - FRONTEND_PORT=8080
+
+    restart: unless-stopped
+    networks:
+      - fire-network
+
+  support:
+    build:
+      context: fire-support
+      dockerfile: Dockerfile
+    container_name: support
+    volumes:
+      - ./logs/fire-support:/var/log/fire-support
+    env_file:
+      - ./fire-support/.env
+    ports:
+      - "${SUPPORT_PORT:-5001}:5001"
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+    networks:
+      - fire-network
+
+  postgres-sonar:
+    image: postgres:15
+    container_name: postgres-sonar
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
+    volumes:
+      - sonar-postgres:/var/lib/postgresql/data
+    networks:
+      - fire-network
+
+  sonarqube:
+    image: sonarqube:10-community
+    container_name: sonarqube
+    depends_on:
+      - postgres-sonar
+    restart: unless-stopped
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres-sonar:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-extensions:/opt/sonarqube/extensions
+      - sonar-logs:/opt/sonarqube/logs
+    networks:
+      - fire-network
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./logging/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - fire-network
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - ./logging/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - ./logs:/var/log
+      - promtail-positions:/tmp
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - fire-network
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./logging/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./logging/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+    depends_on:
+        - loki
+    networks:
+      - fire-network

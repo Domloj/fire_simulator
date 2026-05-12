@@ -1,0 +1,9 @@
+Fire Brigade {agent_id} Peer Analysis:
+
+My Current State:
+{my_state}
+
+Recent Peer Actions:
+{peer_actions}
+
+Should I adjust my current plan based on peer actions? Return JSON analysis.

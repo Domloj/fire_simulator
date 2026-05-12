@@ -1,0 +1,56 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{amsmath}
+
+\geometry{margin=2.5cm}
+
+\title{Issues}
+\author{Fire Simulation System}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\newpage
+
+\section{Wprowadzenie}
+
+\subsection{Cel dokumentu}
+
+Dokument zawiera opisy wszystkich błędów które nie udało się nam naprawić / poprawić.
+\subsection{Zakres dokumentu}
+
+\section{Zatrzymywanie symulacji}
+Dalej pojawiają się błędy przy zatrzymywaniu symulacji / supportu, w wątkach 
+odpowiedzialnych za odbieranie wiadomości z RabbitMQ. Wymusza to restart symulatora i supportu przy każdej nowej symulacji. 
+
+\section{Niedokończone funkcjonalności}
+Brak możliwości modyfikacji ustawień symulatora w wizualizacji. Przygotowany formularz nie jest 
+zintegrowany w pełni z symulatorem oraz backendem. 
+
+\section{Brak możliwości dynamicznego zmieniania typu rekomendacji}
+Zmiana z MCTS na LLM wymaga restartu systemu z zmianą zmiennych środowiskowych 
+
+\section{Problemy wydajnościowe}
+MCTS dla symulacji 25x25 (625 sektorów) generuje różne, często sprzeczne rekomendacje. Wynika to z ograniczeń na czas (1s domyślnie), oraz z ogromu sektorów do przetworzenia. Brygady potrafią otrzymać więc różne rekomendowane akcje w danym momencie. 
+
+\section{Kod}
+Kod odpowiedzialny za wizualizację wymaga refactoringu. Poruszanie się po nim jest praktycznie niemożliwe, zalecamy próbę przepisania go od zera. 
+
+\section{Logi}
+Nie udało się nam opracować stabilnego modelu logowania, logi w trybie DEBUG są zbyt szczegółowe, INFO potrafią nie wyjaśniać błędów symulacji. 
+
+\section{RabbitMQ}
+Zbyt duża liczba kolejek - wymagane uproszczenie dla ilości wszystkich tworzonych kolejek, aby proces komunikacji był bardziej przejrzysty i prostszy do debugu. 
+
+\section{LLM}
+Rekomendacje LLM-owe, generowanie komunikatów językiem naturalnym dla brygad wymaga odpytywania API które trwa zbyt długo i powoduje że symulacja nie jest dynamiczna. Warto rozważyć postawienie lokalnego LLM-a - np. przetestować zastosowanie https://ollama.com/ dla tego projektu. 
+\end{document}

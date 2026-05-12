@@ -1,0 +1,115 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: fire-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fire-backend
+          service: fire-backend
+          __path__: /var/log/fire-backend/**/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?)\s+\[(?P<level>\w+)\]\s+(?P<logger>[\w.]+)\s+-\s+(?P<message>.*)'
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02T15:04:05.000Z'
+
+  - job_name: fire-configuration
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fire-configuration
+          service: fire-configuration
+          __path__: /var/log/fire-configuration/**/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?)\s+\[(?P<level>\w+)\]\s+(?P<logger>[\w.]+)\s+-\s+(?P<message>.*)'
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02T15:04:05.000Z'
+
+  - job_name: fire-simulation
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fire-simulation
+          service: fire-simulation
+          __path__: /var/log/fire-simulation/**/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?)\s+\[(?P<level>\w+)\]\s+(?P<logger>[\w.]+)\s+-\s+(?P<message>.*)'
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02T15:04:05.000Z'
+
+  - job_name: fire-support
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fire-support
+          service: fire-support
+          __path__: /var/log/fire-support/**/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?)\s+\[(?P<level>\w+)\]\s+(?P<logger>[\w.]+)\s+-\s+(?P<message>.*)'
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02T15:04:05.000Z'
+
+  - job_name: fire-visualization
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fire-visualization
+          service: fire-visualization
+          __path__: /var/log/fire-visualization/**/*.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?)\s+\[(?P<level>\w+)\]\s+(?P<logger>[\w.]+)\s+-\s+(?P<message>.*)'
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02T15:04:05.000Z'

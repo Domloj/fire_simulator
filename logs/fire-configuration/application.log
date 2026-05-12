@@ -1,0 +1,91 @@
+2026-01-22T17:56:06.947Z [INFO] app.main - Starting application lifespan, initializing database...
+2026-01-22T17:56:06.954Z [INFO] app.main - MongoDB available
+2026-01-22T17:56:06.955Z [INFO] app.main - Initializing database...
+2026-01-22T17:56:06.959Z [INFO] app.main - Found existing root node with ID: 69725825665658a0f0132487
+2026-01-22T17:56:06.965Z [INFO] app.main - Loading configuration files from: cracow into DB folder: cracow
+2026-01-22T17:56:06.969Z [INFO] app.main - Upserted configuration: krakow_3x3.json (27709 characters)
+2026-01-22T17:56:06.975Z [INFO] app.main - Upserted configuration: krakow_4x4.json (48748 characters)
+2026-01-22T17:56:06.976Z [INFO] app.main - Successfully loaded 2 out of 2 configuration files from cracow
+2026-01-22T17:56:06.978Z [INFO] app.main - Loading configuration files from: forest into DB folder: forest
+2026-01-22T17:56:06.983Z [INFO] app.main - Upserted configuration: forest_10x10.json (114648 characters)
+2026-01-22T17:56:07.004Z [INFO] app.main - Upserted configuration: forest_25x25.json (698428 characters)
+2026-01-22T17:56:07.008Z [INFO] app.main - Upserted configuration: forest_5x5.json (41022 characters)
+2026-01-22T17:56:07.009Z [INFO] app.main - Successfully loaded 3 out of 3 configuration files from forest
+2026-01-22T17:56:07.009Z [INFO] app.main - Database initialization completed successfully
+2026-01-22T18:02:21.875Z [INFO] app.main - Application shutting down...
+2026-01-22T18:03:03.661Z [INFO] app.main - Starting application lifespan, initializing database...
+2026-01-22T18:03:03.688Z [INFO] app.main - MongoDB available
+2026-01-22T18:03:03.688Z [INFO] app.main - Initializing database...
+2026-01-22T18:03:03.692Z [INFO] app.main - Found existing root node with ID: 69725825665658a0f0132487
+2026-01-22T18:03:03.717Z [INFO] app.main - Loading configuration files from: cracow into DB folder: cracow
+2026-01-22T18:03:03.751Z [INFO] app.main - Upserted configuration: krakow_3x3.json (27709 characters)
+2026-01-22T18:03:03.757Z [INFO] app.main - Upserted configuration: krakow_4x4.json (48748 characters)
+2026-01-22T18:03:03.757Z [INFO] app.main - Successfully loaded 2 out of 2 configuration files from cracow
+2026-01-22T18:03:03.766Z [INFO] app.main - Loading configuration files from: forest into DB folder: forest
+2026-01-22T18:03:03.770Z [INFO] app.main - Upserted configuration: forest_10x10.json (114648 characters)
+2026-01-22T18:03:03.816Z [INFO] app.main - Upserted configuration: forest_25x25.json (698428 characters)
+2026-01-22T18:03:03.839Z [INFO] app.main - Upserted configuration: forest_5x5.json (41022 characters)
+2026-01-22T18:03:03.840Z [INFO] app.main - Successfully loaded 3 out of 3 configuration files from forest
+2026-01-22T18:03:03.840Z [INFO] app.main - Database initialization completed successfully
+2026-01-22T18:22:42.185Z [INFO] app.main - Application shutting down...
+2026-01-22T18:23:25.901Z [INFO] app.main - Starting application lifespan, initializing database...
+2026-01-22T18:23:25.933Z [INFO] app.main - MongoDB available
+2026-01-22T18:23:25.934Z [INFO] app.main - Initializing database...
+2026-01-22T18:23:25.944Z [INFO] app.main - Found existing root node with ID: 69725825665658a0f0132487
+2026-01-22T18:23:25.957Z [INFO] app.main - Loading configuration files from: cracow into DB folder: cracow
+2026-01-22T18:23:25.963Z [INFO] app.main - Upserted configuration: krakow_3x3.json (27709 characters)
+2026-01-22T18:23:25.979Z [INFO] app.main - Upserted configuration: krakow_4x4.json (48748 characters)
+2026-01-22T18:23:25.980Z [INFO] app.main - Successfully loaded 2 out of 2 configuration files from cracow
+2026-01-22T18:23:25.987Z [INFO] app.main - Loading configuration files from: forest into DB folder: forest
+2026-01-22T18:23:25.995Z [INFO] app.main - Upserted configuration: forest_10x10.json (114648 characters)
+2026-01-22T18:23:26.026Z [INFO] app.main - Upserted configuration: forest_25x25.json (698428 characters)
+2026-01-22T18:23:26.030Z [INFO] app.main - Upserted configuration: forest_5x5.json (41022 characters)
+2026-01-22T18:23:26.031Z [INFO] app.main - Successfully loaded 3 out of 3 configuration files from forest
+2026-01-22T18:23:26.032Z [INFO] app.main - Database initialization completed successfully
+2026-01-22T23:28:04.299Z [INFO] app.main - Application shutting down...
+2026-01-23T08:47:41.230Z [INFO] app.main - Starting application lifespan, initializing database...
+2026-01-23T08:47:41.251Z [INFO] app.main - MongoDB available
+2026-01-23T08:47:41.252Z [INFO] app.main - Initializing database...
+2026-01-23T08:47:41.262Z [INFO] app.main - Found existing root node with ID: 69725825665658a0f0132487
+2026-01-23T08:47:41.270Z [INFO] app.main - Loading configuration files from: cracow into DB folder: cracow
+2026-01-23T08:47:41.275Z [INFO] app.main - Upserted configuration: krakow_3x3.json (27709 characters)
+2026-01-23T08:47:41.286Z [INFO] app.main - Upserted configuration: krakow_4x4.json (48748 characters)
+2026-01-23T08:47:41.287Z [INFO] app.main - Successfully loaded 2 out of 2 configuration files from cracow
+2026-01-23T08:47:41.292Z [INFO] app.main - Loading configuration files from: forest into DB folder: forest
+2026-01-23T08:47:41.301Z [INFO] app.main - Upserted configuration: forest_10x10.json (114648 characters)
+2026-01-23T08:47:41.326Z [INFO] app.main - Upserted configuration: forest_25x25.json (698428 characters)
+2026-01-23T08:47:41.330Z [INFO] app.main - Upserted configuration: forest_5x5.json (41022 characters)
+2026-01-23T08:47:41.331Z [INFO] app.main - Successfully loaded 3 out of 3 configuration files from forest
+2026-01-23T08:47:41.331Z [INFO] app.main - Database initialization completed successfully
+2026-01-26T07:23:20.174Z [INFO] app.main - Application shutting down...
+2026-01-27T09:48:06.749Z [INFO] app.main - Starting application lifespan, initializing database...
+2026-01-27T09:48:07.270Z [INFO] app.main - MongoDB available
+2026-01-27T09:48:07.272Z [INFO] app.main - Initializing database...
+2026-01-27T09:48:07.282Z [INFO] app.main - Found existing root node with ID: 69725825665658a0f0132487
+2026-01-27T09:48:07.290Z [INFO] app.main - Loading configuration files from: cracow into DB folder: cracow
+2026-01-27T09:48:07.295Z [INFO] app.main - Upserted configuration: krakow_3x3.json (27709 characters)
+2026-01-27T09:48:07.303Z [INFO] app.main - Upserted configuration: krakow_4x4.json (48748 characters)
+2026-01-27T09:48:07.304Z [INFO] app.main - Successfully loaded 2 out of 2 configuration files from cracow
+2026-01-27T09:48:07.307Z [INFO] app.main - Loading configuration files from: forest into DB folder: forest
+2026-01-27T09:48:07.313Z [INFO] app.main - Upserted configuration: forest_10x10.json (114648 characters)
+2026-01-27T09:48:07.337Z [INFO] app.main - Upserted configuration: forest_25x25.json (698428 characters)
+2026-01-27T09:48:07.340Z [INFO] app.main - Upserted configuration: forest_5x5.json (41022 characters)
+2026-01-27T09:48:07.340Z [INFO] app.main - Successfully loaded 3 out of 3 configuration files from forest
+2026-01-27T09:48:07.341Z [INFO] app.main - Database initialization completed successfully
+2026-01-27T11:16:33.213Z [INFO] app.main - Application shutting down...
+2026-01-27T11:27:54.537Z [INFO] app.main - Starting application lifespan, initializing database...
+2026-01-27T11:27:54.598Z [INFO] app.main - MongoDB available
+2026-01-27T11:27:54.599Z [INFO] app.main - Initializing database...
+2026-01-27T11:27:54.796Z [INFO] app.main - Root node created with ID: 6978a13a99cde882fbea296b
+2026-01-27T11:27:54.799Z [INFO] app.main - Created settings folder under root
+2026-01-27T11:27:54.801Z [INFO] app.main - Created sim_settings file in settings folder
+2026-01-27T11:27:54.828Z [INFO] app.main - Loading configuration files from: cracow into DB folder: cracow
+2026-01-27T11:27:54.862Z [INFO] app.main - Upserted configuration: krakow_3x3.json (27709 characters)
+2026-01-27T11:27:54.898Z [INFO] app.main - Upserted configuration: krakow_4x4.json (48748 characters)
+2026-01-27T11:27:54.898Z [INFO] app.main - Successfully loaded 2 out of 2 configuration files from cracow
+2026-01-27T11:27:54.930Z [INFO] app.main - Loading configuration files from: forest into DB folder: forest
+2026-01-27T11:27:54.935Z [INFO] app.main - Upserted configuration: forest_10x10.json (114648 characters)
+2026-01-27T11:27:55.013Z [INFO] app.main - Upserted configuration: forest_25x25.json (698428 characters)
+2026-01-27T11:27:55.041Z [INFO] app.main - Upserted configuration: forest_5x5.json (41022 characters)
+2026-01-27T11:27:55.041Z [INFO] app.main - Successfully loaded 3 out of 3 configuration files from forest
+2026-01-27T11:27:55.041Z [INFO] app.main - Database initialization completed successfully

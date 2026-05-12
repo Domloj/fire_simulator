@@ -1,0 +1,12 @@
+Fire Brigade {agent_id} Decision Request:
+
+Current State:
+{current_state}
+
+Available Sectors with Fires:
+{available_sectors}
+
+Recent Peer Actions (other brigades):
+{peer_actions}
+
+What should this fire brigade do? Return JSON decision.

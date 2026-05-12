@@ -1,0 +1,327 @@
+{
+  "timestamp": 1736786400,
+  "sectors": {
+    "1": {
+      "sectorId": 1,
+      "row": 1,
+      "column": 1,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "2": {
+      "sectorId": 2,
+      "row": 1,
+      "column": 2,
+      "state": {
+        "temperature": 25,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 55,
+        "plantLitterMoisture": 35,
+        "co2Concentration": 450,
+        "pm2_5Concentration": 15,
+        "fireLevel": 65.5,
+        "burnLevel": 22.3,
+        "extinguishLevel": 0
+      }
+    },
+    "3": {
+      "sectorId": 3,
+      "row": 1,
+      "column": 3,
+      "state": {
+        "temperature": 23,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 58,
+        "plantLitterMoisture": 38,
+        "co2Concentration": 420,
+        "pm2_5Concentration": 12,
+        "fireLevel": 42.0,
+        "burnLevel": 15.8,
+        "extinguishLevel": 0
+      }
+    },
+    "4": {
+      "sectorId": 4,
+      "row": 1,
+      "column": 4,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "5": {
+      "sectorId": 5,
+      "row": 2,
+      "column": 1,
+      "state": {
+        "temperature": 22,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 58,
+        "plantLitterMoisture": 38,
+        "co2Concentration": 410,
+        "pm2_5Concentration": 11,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "6": {
+      "sectorId": 6,
+      "row": 2,
+      "column": 2,
+      "state": {
+        "temperature": 28,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 50,
+        "plantLitterMoisture": 30,
+        "co2Concentration": 500,
+        "pm2_5Concentration": 20,
+        "fireLevel": 88.7,
+        "burnLevel": 45.2,
+        "extinguishLevel": 5.0
+      }
+    },
+    "7": {
+      "sectorId": 7,
+      "row": 2,
+      "column": 3,
+      "state": {
+        "temperature": 24,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 56,
+        "plantLitterMoisture": 36,
+        "co2Concentration": 430,
+        "pm2_5Concentration": 13,
+        "fireLevel": 18.5,
+        "burnLevel": 5.2,
+        "extinguishLevel": 0
+      }
+    },
+    "8": {
+      "sectorId": 8,
+      "row": 2,
+      "column": 4,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "9": {
+      "sectorId": 9,
+      "row": 3,
+      "column": 1,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "10": {
+      "sectorId": 10,
+      "row": 3,
+      "column": 2,
+      "state": {
+        "temperature": 21,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 59,
+        "plantLitterMoisture": 39,
+        "co2Concentration": 405,
+        "pm2_5Concentration": 10.5,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "11": {
+      "sectorId": 11,
+      "row": 3,
+      "column": 3,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "12": {
+      "sectorId": 12,
+      "row": 3,
+      "column": 4,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "13": {
+      "sectorId": 13,
+      "row": 4,
+      "column": 1,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "14": {
+      "sectorId": 14,
+      "row": 4,
+      "column": 2,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "15": {
+      "sectorId": 15,
+      "row": 4,
+      "column": 3,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    },
+    "16": {
+      "sectorId": 16,
+      "row": 4,
+      "column": 4,
+      "state": {
+        "temperature": 20,
+        "windSpeed": 5,
+        "windDirection": "NE",
+        "airHumidity": 60,
+        "plantLitterMoisture": 40,
+        "co2Concentration": 400,
+        "pm2_5Concentration": 10,
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0
+      }
+    }
+  },
+  "fireBrigades": {
+    "0": {
+      "fireBrigadeId": 0,
+      "state": "AVAILABLE",
+      "baseLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.972374906678574
+      },
+      "currentLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.972374906678574
+      }
+    },
+    "1": {
+      "fireBrigadeId": 1,
+      "state": "AVAILABLE",
+      "baseLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.96244923136875
+      },
+      "currentLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.96244923136875
+      }
+    },
+    "2": {
+      "fireBrigadeId": 2,
+      "state": "AVAILABLE",
+      "baseLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.952523556058926
+      },
+      "currentLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.952523556058926
+      }
+    },
+    "3": {
+      "fireBrigadeId": 3,
+      "state": "AVAILABLE",
+      "baseLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.942597880749104
+      },
+      "currentLocation": {
+        "latitude": 50.06570785210219,
+        "longitude": 19.942597880749104
+      }
+    }
+  }
+}

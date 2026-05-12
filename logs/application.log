@@ -1,0 +1,30 @@
+2026-01-20T12:31:01.760 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - Starting FireBackendApplication using Java 21.0.9 with PID 402753 (/home/dominiq/Desktop/studio-projektowe/fire-backend/target/classes started by dominiq in /home/dominiq/Desktop/studio-projektowe)
+2026-01-20T12:31:01.763 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - The following 1 profile is active: "dev"
+2026-01-20T12:31:03.148 [INFO] [fire-backend] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8181 (http)
+2026-01-20T12:31:03.159 [INFO] [fire-backend] o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8181"]
+2026-01-20T12:31:03.162 [INFO] [fire-backend] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-01-20T12:31:03.162 [INFO] [fire-backend] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-01-20T12:31:03.216 [INFO] [fire-backend] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-01-20T12:31:03.218 [INFO] [fire-backend] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1415 ms
+2026-01-20T12:31:03.860 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - RabbitMQ consumers ready
+2026-01-20T12:31:04.486 [INFO] [fire-backend] o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-01-20T12:31:04.535 [INFO] [fire-backend] o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8181"]
+2026-01-20T12:31:04.559 [INFO] [fire-backend] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8181 (http) with context path ''
+2026-01-20T12:31:04.575 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - Started FireBackendApplication in 3.274 seconds (process running for 3.874)
+2026-01-20T12:31:04.686 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - Listing registered request mappings:
+2026-01-20T12:31:04.687 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - { [/error], produces [text/html]} => BasicErrorController#errorHtml
+2026-01-20T12:31:04.688 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/simulation/llm-chat], produces [text/event-stream]} => SimulationStateController#streamLlmChat
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/run-simulation], produces [text/event-stream]} => SimulationStateController#runSimulation
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/stop-simulation]} => SimulationStateController#sendStopRequest
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/orderForestPatrol]} => OrdersController#sentOrderPatrol
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/send-simulation-request]} => SimulationStateController#sendSimulationRequest
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/orderForestPatrol]} => SimulationStateController#orderForestPatrol
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/orderFireBrigade]} => SimulationStateController#orderFireBrigade
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/assignBrigades]} => SimulationStateController#assignBrigades
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/ping]} => SimpleTestController#ping
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/send-simulation-request-debug]} => SimpleTestController#debugSend
+2026-01-20T12:31:04.689 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/simulation/snapshot]} => SimulationStateController#getSimulationSnapshot
+2026-01-20T12:31:04.690 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/set-speed]} => SimulationStateController#setSimulationSpeed
+2026-01-20T12:31:04.690 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/orderFireBrigade]} => OrdersController#sentOrderBrigade
+2026-01-20T12:31:04.690 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - { [/error]} => BasicErrorController#error
+2026-01-20T12:31:04.690 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/send-simulation-request]} => CompatibilityController#sendSimulationRequestRoot

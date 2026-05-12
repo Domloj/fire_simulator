@@ -1,0 +1,9 @@
+
+fire-backend/** 
+fire-configurations/**
+fire-simulation/**
+fire-visualization/** 
+
+.env
+.env.*
+!.env.example
