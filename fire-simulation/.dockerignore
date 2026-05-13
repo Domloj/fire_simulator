@@ -1,0 +1,45 @@
+# Ignore Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pycache
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# pytest / pip cache
+.pytest_cache/
+.pip-wheel-metadata/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Editor / OS files
+*.swp
+*.log
+.DS_Store
+.vscode/
+
+# Git
+.git
+.gitignore
+
+# Optional: node_modules if any front-end assets
+node_modules/
+
+# Don't send local logs or data directories
+logs/
+data/
+
+# Exclude compiled artifacts
+*.so
+
+# Dockerfile and compose files are not needed inside context
+Dockerfile
+../docker-compose.yml

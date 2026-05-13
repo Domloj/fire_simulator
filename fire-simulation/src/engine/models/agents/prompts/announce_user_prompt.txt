@@ -1,0 +1,8 @@
+Generate a concise announcement for this action. Output exactly one short line (<=25 words):
+- Action: {action_type}
+- Target: {sector_info}
+- Status: {status}
+- Context: {context_why}
+
+Example:
+"Moving to sector 8 to contain active spread; will prioritize perimeter"

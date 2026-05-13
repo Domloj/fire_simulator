@@ -1,0 +1,6 @@
+FOREST_NAME = "forestName"
+ROWS = "rows"
+COLUMNS = "columns"
+SECTORS = "sectors"
+FIRE_BRIGADES = "fireBrigades"
+FORESTER_PATROLS = "foresterPatrols"

@@ -1,0 +1,15 @@
+Context:
+- STATUS: {my_task}
+- RECENT_CHAT: {chat_history}
+- COORDINATOR_FEEDBACK: {coordinator_feedback}
+
+Task:
+Analyze the situation and output a JSON object (see system prompt) with:
+- observation: one short sentence summarizing tactical observation
+- proposition: an object with action, target_sector (int or null) and reason
+- narrative: one short, free-form natural sentence (may be random)
+
+Example JSON (single line):
+{example_json}
+
+If unable to decide, return nulls or simple placeholders but always valid JSON.

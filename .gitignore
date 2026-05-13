@@ -1,8 +1,16 @@
 
 fire-backend/** 
 fire-configurations/**
-fire-simulation/**
 fire-visualization/** 
+
+# Python build/cache (OK for fire-simulation source)
+fire-simulation/__pycache__/
+fire-simulation/**/__pycache__/
+fire-simulation/*.pyc
+fire-simulation/**/*.pyc
+fire-simulation/*.egg-info/
+fire-simulation/**/*.egg-info/
+fire-simulation/target/
 
 .env
 .env.*
