@@ -101,17 +101,87 @@ class Sector:
             self.fuel > 0 and
             self.sector_type != SectorType.WATER
         )
-    
+
     def is_burning(self) -> bool:
         """Check if sector is currently burning."""
         return self.state == SectorState.BURNING
-    
-    def get_flammability_coefficient(self) -> float:
+
+    # ------------------------------------------------------------------
+    # Fire classification per article, Table 1
+    #
+    # Level | Name           | Resources needed
+    #   0   | NON_COMBUSTED  | –
+    #   1   | EARLY_FIRE     | one fire engine
+    #   2   | MEDIUM_FIRE    | local fire station crews
+    #   3   | FULL_FIRE      | maximum available crews
+    #   4   | EXTREME_FIRE   | exceeds local capabilities
+    #   5   | COMBUSTED /    | –  (fire over)
+    #       | EXTINGUISHED   |
+    #
+    # Mapping from continuous fireLevel [0,1] to discrete level 0–4:
+    #   0          → 0  (no fire)
+    #   (0, 0.25]  → 1  EARLY_FIRE
+    #   (0.25,0.5] → 2  MEDIUM_FIRE
+    #   (0.5,0.75] → 3  FULL_FIRE
+    #   (0.75,1.0) → 4  EXTREME_FIRE
+    #   ASH / EXTINGUISHED → 5
+    # ------------------------------------------------------------------
+
+    def get_fire_classification(self) -> int:
+        """
+        Return fire classification level 0–5 per Klimek ISD2024 Table 1.
+
+        Used by telemetry and the support system to determine required
+        firefighting resources.
+        """
+        if self.state in (SectorState.ASH, SectorState.EXTINGUISHED):
+            return 5
+        if self.state != SectorState.BURNING:
+            return 0
+        if self.fire_level <= 0.0:
+            return 0
+        if self.fire_level <= 0.25:
+            return 1  # EARLY_FIRE
+        if self.fire_level <= 0.50:
+            return 2  # MEDIUM_FIRE
+        if self.fire_level <= 0.75:
+            return 3  # FULL_FIRE
+        return 4      # EXTREME_FIRE
+
+    def get_fire_state_name(self) -> str:
+        """
+        Return telemetry FireState string matching article classification.
+
+        COMBUSTED and EXTINGUISHED are kept distinct at level 5 so that
+        FFBackend can differentiate cause (burned-out vs. suppressed).
+        """
+        _names = {
+            0: "NON_COMBUSTED",
+            1: "EARLY_FIRE",
+            2: "MEDIUM_FIRE",
+            3: "FULL_FIRE",
+            4: "EXTREME_FIRE",
+        }
+        level = self.get_fire_classification()
+        if level == 5:
+            return "EXTINGUISHED" if self.state == SectorState.EXTINGUISHED else "COMBUSTED"
+        return _names[level]
+
+
         """
         Get α coefficient based on vegetation type (section 6.1).
         
+        Corrected coefficients per forest fire physics:
+        - FIELD (grasslands): fastest burning, α ~ 1.5
+        - FALLOW (abandoned fields): fast, α ~ 1.2
+        - CONIFEROUS (pine/spruce): fast-burning, resinous, α ~ 1.2
+        - MIXED (mixed forest): baseline, α ~ 1.0
+        - DECIDUOUS (hardwood): slower-burning, denser wood, α ~ 0.8
+        - WATER: non-flammable, α ~ 0.0
+        - UNTRACKED: unknown type, baseline, α ~ 1.0
+        
         Returns:
-            Flammability coefficient for fire spread calculation
+            Flammability coefficient α for fire spread calculation (NOT inverted)
         """
         coefficients = {
             SectorType.FIELD: 1.5,
