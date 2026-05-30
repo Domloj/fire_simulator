@@ -48,16 +48,15 @@ class Wind:
 class FirePropagationConfig:
     """Configuration for fire propagation parameters."""
 
-    # p_ign coefficients (section 2.4.1)
-    alpha_wind: float = 0.3           # Wind influence coefficient (wind speed must be normalised to [0,1])
-    beta_temperature: float = 0.02    # Temperature influence coefficient
-    max_wind: float = 80.0            # km/h — upper bound for wind normalisation: w_norm = speed_kmh / max_wind
+    # p_ign coefficients per spec section 7 (parametry konfiguracyjne silnika)
+    alpha_wind: float = 0.01          # windAlpha — wind influence coefficient (|w| in km/h)
+    beta_temperature: float = 0.02    # betaTemperature — temperature coefficient
 
     # Reference values
     reference_temperature: float = 20.0  # °C
 
-    # Ignition (section 2.4.1)
-    ignition_base: float = 0.15       # Initial fireLevel of a newly ignited sector (ℓ₀)
+    # Ignition (spec section 7: ignitionBase = 0.10)
+    ignition_base: float = 0.10       # Initial fireLevel of a newly ignited sector (ℓ₀)
 
     # Fire growth (section 2.4.2 R3)
     spread_rate: float = 0.1          # Base spread rate per tick
@@ -122,46 +121,26 @@ class FirePropagation:
                                    to_row: int,
                                    to_col: int) -> float:
         """
-        Calculate wind direction factor using cosine of angle.
-
-        Per spec 2.4.1: wind_component = 1 + α · ‖w‖_norm · cosθ
-        where ‖w‖_norm = speed_kmh / max_wind ∈ [0, 1].
-
-        - cosθ = 1 when aligned with wind (boosts ignition)
-        - cosθ = -1 when against wind (reduces ignition)
-        - No clamping here; clamp done in calculate_ignition_probability
-
-        Returns:
-            Unnormalized wind component (can be <1 or >1)
+        Wind component per spec section 2.4.1:
+            wind_component = 1 + α · |w| · cosθ
+        where |w| is wind speed in km/h (no normalisation per spec).
         """
-        # Direction from burning sector to target
         dr = to_row - from_row
         dc = to_col - from_col
 
-        # Convert to angle (0=North, 90=East, 180=South, 270=West)
+        # Direction from burning sector to target (0=N, 90=E, 180=S, 270=W)
         direction_angle = math.atan2(dc, -dr) * 180 / math.pi
         if direction_angle < 0:
             direction_angle += 360
 
-        # Angle between wind and spread direction
         angle_diff = direction_angle - wind.direction_degrees
-
-        # Normalise to [-180, 180]
         while angle_diff > 180:
             angle_diff -= 360
         while angle_diff < -180:
             angle_diff += 360
 
         cos_factor = math.cos(math.radians(angle_diff))
-
-        # Normalise wind speed to [0, 1] before applying alpha
-        wind_norm = wind.speed / self.config.max_wind if self.config.max_wind > 0 else 0.0
-        wind_norm = max(0.0, min(1.0, wind_norm))
-
-        # spec: 1 + α · ‖w‖_norm · cosθ
-        wind_component = 1.0 + self.config.alpha_wind * wind_norm * cos_factor
-
-        return wind_component
+        return 1.0 + self.config.alpha_wind * wind.speed * cos_factor
     
     def calculate_ignition_probability(self,
                                       target_sector: Sector,

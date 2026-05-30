@@ -167,22 +167,7 @@ class Sector:
             return "EXTINGUISHED" if self.state == SectorState.EXTINGUISHED else "COMBUSTED"
         return _names[level]
 
-
-        """
-        Get α coefficient based on vegetation type (section 6.1).
-        
-        Corrected coefficients per forest fire physics:
-        - FIELD (grasslands): fastest burning, α ~ 1.5
-        - FALLOW (abandoned fields): fast, α ~ 1.2
-        - CONIFEROUS (pine/spruce): fast-burning, resinous, α ~ 1.2
-        - MIXED (mixed forest): baseline, α ~ 1.0
-        - DECIDUOUS (hardwood): slower-burning, denser wood, α ~ 0.8
-        - WATER: non-flammable, α ~ 0.0
-        - UNTRACKED: unknown type, baseline, α ~ 1.0
-        
-        Returns:
-            Flammability coefficient α for fire spread calculation (NOT inverted)
-        """
+    def get_flammability_coefficient(self) -> float:
         coefficients = {
             SectorType.FIELD: 1.5,
             SectorType.FALLOW: 1.2,
@@ -193,7 +178,7 @@ class Sector:
             SectorType.UNTRACKED: 1.0,
         }
         return coefficients.get(self.sector_type, 1.0)
-    
+
     def __repr__(self) -> str:
         return (
             f"Sector(id={self.sector_id}, type={self.sector_type.value}, "
