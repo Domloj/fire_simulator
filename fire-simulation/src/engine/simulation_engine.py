@@ -20,6 +20,7 @@ from src.engine.rng_manager import RngManager
 from src.engine.models.sector import Sector, SectorState, SectorType
 from src.engine.models.fire_propagation import FirePropagation, Wind, FirePropagationConfig
 from src.engine.models.event_queue import EventQueue
+from src.engine.agent_manager import AgentManager, AgentEvent
 
 
 @dataclass
@@ -47,8 +48,17 @@ class SimulationSnapshot:
         """Create deep copy of snapshot."""
         return copy.deepcopy(self)
     
+    # Agents (mutated in place by AgentManager; snapshotted in engine.snapshot())
+    agents: Dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
+        # rng_state contains numpy state tuples which aren't JSON-serializable;
+        # expose just the seed and call count for the snapshot endpoint.
+        rng_summary = {
+            "seed": self.rng_state.get("seed"),
+            "call_count": self.rng_state.get("call_count"),
+        }
         return {
             "simulation_id": self.simulation_id,
             "tick": self.tick,
@@ -59,8 +69,9 @@ class SimulationSnapshot:
                 "direction_degrees": self.wind.direction_degrees,
             },
             "global_temperature": self.global_temperature,
-            "rng_state": self.rng_state,
+            "rng_state": rng_summary,
             "events": self.events.to_dict(),
+            "agents": self.agents,
         }
 
 
@@ -76,7 +87,8 @@ class SimulationEngine:
                  rng: Optional[RngManager] = None,
                  fire_config: Optional[FirePropagationConfig] = None,
                  simulation_id: Optional[str] = None,
-                 tick_interval: float = 1.0):
+                 tick_interval: float = 1.0,
+                 agent_manager: Optional[AgentManager] = None):
         """
         Initialize simulation engine.
         
@@ -100,9 +112,13 @@ class SimulationEngine:
         
         # Build sector adjacency map for 4-neighborhood (section 5.3)
         self._build_adjacency_map()
-        
+
+        # Agent manager (spec section 4)
+        self.agent_manager = agent_manager or AgentManager()
+
         # Current state
         self.current_snapshot: Optional[SimulationSnapshot] = None
+        self.last_events: List[AgentEvent] = []
     
     def _build_adjacency_map(self) -> None:
         """Build adjacency map for 4-neighborhood (North, East, South, West).
@@ -156,6 +172,7 @@ class SimulationEngine:
             wind=initial_wind or Wind(speed=0.0, direction_degrees=0.0),
             global_temperature=20.0,
             rng_state=self.rng.get_state(),
+            agents=self.agent_manager.to_dict(),
         )
         
         return self.current_snapshot
@@ -184,11 +201,15 @@ class SimulationEngine:
         
         # Phase 2: Fire propagation
         next_sectors = self._phase_fire_propagation(previous_snapshot)
-        
-        # Phase 3: Agent updates (TODO - agents from existing agent_manager)
-        # next_sectors = self._phase_agent_updates(next_sectors)
-        
-        # Phase 4: Environment updates
+
+        # Phase 3: Agent updates (spec section 2.7 step 2)
+        self.last_events = self.agent_manager.process_tick(
+            next_sectors=next_sectors,
+            previous_sectors=previous_snapshot.sectors,
+            current_tick=self.tick_count + 1,
+        )
+
+        # Phase 4: Environment updates (random wind walk, spec section 3.4)
         next_wind, next_temperature = self._phase_environment_update(previous_snapshot)
         
         # Phase 5: Telemetry generation (TODO - integrate with messaging)
@@ -207,6 +228,7 @@ class SimulationEngine:
             wind=next_wind,
             global_temperature=next_temperature,
             rng_state=self.rng.get_state(),
+            agents=self.agent_manager.to_dict(),
         )
         
         return self.current_snapshot
@@ -254,11 +276,10 @@ class SimulationEngine:
                         neighbor_next.fire_level = 0.1  # Initial fire level
                     # else: log warning if trying to re-ignite already burning sector
             
-            # Update fire level (section 6.2)
-            # Separate multipliers: sector effect only
-            sector_multiplier = 1.0 / prev_sector.get_flammability_coefficient()
-            sector_multiplier = max(0.1, min(sector_multiplier, 2.0))  # Clamp
-            
+            # Update fire level per spec section 2.5.1 R3:
+            # ∆ℓ = spreadRate · k_sector (k_sector = flammability coefficient)
+            sector_multiplier = prev_sector.get_flammability_coefficient()
+
             next_sector.fire_level = self.fire_propagation.update_fire_level(
                 prev_sector,
                 sector_multiplier=sector_multiplier,
@@ -275,22 +296,33 @@ class SimulationEngine:
                 next_sector.state = SectorState.ASH
                 next_sector.fire_level = 0.0
             
-            # Check extinguishment (section 6.5)
+            # Check extinguishment (spec section 2.5.1 R5: extinguishLevel ≥ ethr → Ext)
             if self.fire_propagation.check_extinguishment(next_sector):
-                next_sector.state = SectorState.ASH
+                next_sector.state = SectorState.EXTINGUISHED
                 next_sector.fire_level = 0.0
         
         return next_sectors
     
     def _phase_environment_update(self, previous_snapshot: SimulationSnapshot) -> Tuple[Wind, float]:
         """
-        Phase 4: Environment updates (section 7.2).
-        
-        Currently stub - to be extended with wind dynamics and temperature evolution.
+        Phase 4: Environment updates (spec section 3.4).
+
+        "W każdym kroku derywacji prędkość i kierunek wiatru ewoluują losowo
+         w małych granicach, co symuluje naturalne fluktuacje warunków atmosferycznych."
+
+        Small random walk on wind speed and direction using central RNG.
         """
-        # For now, return unchanged wind and temperature
-        # TODO: Implement wind dynamics and temperature evolution
-        return previous_snapshot.wind.clone() if hasattr(previous_snapshot.wind, 'clone') else previous_snapshot.wind, previous_snapshot.global_temperature
+        prev_wind = previous_snapshot.wind
+
+        # Small bounded random perturbations (spec: "w małych granicach")
+        speed_delta = self.rng.uniform(-1.0, 1.0)          # ±1 km/h per tick
+        direction_delta = self.rng.uniform(-5.0, 5.0)      # ±5° per tick
+
+        new_speed = max(0.0, min(80.0, prev_wind.speed + speed_delta))
+        new_direction = (prev_wind.direction_degrees + direction_delta) % 360.0
+
+        next_wind = Wind(speed=new_speed, direction_degrees=new_direction)
+        return next_wind, previous_snapshot.global_temperature
     
     def get_snapshot(self) -> SimulationSnapshot:
         """Get current simulation snapshot."""
