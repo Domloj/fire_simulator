@@ -21,6 +21,7 @@ from src.engine.models.sector import Sector, SectorState, SectorType
 from src.engine.models.fire_propagation import Wind, FirePropagationConfig
 from src.engine.rng_manager import RngManager
 from src.engine.agent_manager import AgentManager, Location as AgentLocation
+from src.engine.sensors import SensorArray, SensorType, SensorConfig
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
@@ -56,6 +57,8 @@ class EngineHost:
             self.agent_manager = _build_agent_manager(map_config)
 
             rng = RngManager(seed=self.seed)
+            sensor_array = _build_sensor_array(map_config, rng)
+            
             self.engine = SimulationEngine(
                 forest_map=forest_map,
                 rng=rng,
@@ -64,6 +67,8 @@ class EngineHost:
                 tick_interval=self.tick_interval,
                 agent_manager=self.agent_manager,
             )
+            # Assign sensor array for telemetry (spec 5.2.2)
+            self.engine.sensor_array = sensor_array
             self.engine.initialize(
                 seed=self.seed,
                 initial_wind=_parse_wind(map_config.get("wind")),
@@ -185,6 +190,49 @@ def _build_agent_manager(cfg: Dict[str, Any]) -> AgentManager:
             ),
         )
     return manager
+
+
+def _build_sensor_array(cfg: Dict[str, Any], rng: RngManager) -> SensorArray:
+    """
+    Build sensor array from map config (spec 5.2.2).
+    
+    Supports per-sector sensor configuration via mapConfig.sensors:
+    {
+        "sensors": {
+            "WIND_SPEED": [sector_id1, sector_id2, ...],
+            "TEMP_HUMIDITY": [sector_id3, ...],
+            ...
+        }
+    }
+    """
+    sensor_array = SensorArray(rng=rng)
+    sensors_config = cfg.get("sensors", {}) or {}
+    
+    # Build per-sector sensor configuration
+    sector_sensors = {}  # sector_id -> list of SensorType
+    for sensor_type_str, sector_ids in sensors_config.items():
+        try:
+            sensor_type = SensorType[sensor_type_str]
+        except KeyError:
+            logger.warning(f"Unknown sensor type: {sensor_type_str}, skipping")
+            continue
+        
+        for sector_id in (sector_ids or []):
+            if sector_id not in sector_sensors:
+                sector_sensors[sector_id] = []
+            sector_sensors[sector_id].append(sensor_type)
+    
+    # Register sensors with SensorArray
+    for sector_id, sensor_types in sector_sensors.items():
+        sensor_config = SensorConfig(
+            sector_id=sector_id,
+            sensor_id=sector_id * 100,  # Simple ID scheme: sector_id * 100
+            enabled_types=sensor_types,
+            location={"lon": 0.0, "lat": 0.0},  # Location will be updated from sector later
+        )
+        sensor_array.add_sensor(sensor_config)
+    
+    return sensor_array
 
 
 def _parse_wind(wind_cfg: Optional[Dict[str, Any]]) -> Optional[Wind]:
