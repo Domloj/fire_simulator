@@ -22,7 +22,7 @@ from src.engine.rng_manager import RngManager
 from src.engine.models.sector import Sector, SectorState, SectorType
 from src.engine.models.fire_propagation import FirePropagation, Wind, FirePropagationConfig
 from src.engine.models.event_queue import EventQueue
-from src.engine.agent_manager import AgentManager, AgentEvent
+from src.engine.agent_manager import AgentManager, AgentEvent, AgentEventType
 from src.engine.sensors import SensorArray, SensorType, SensorReading
 from src.messaging.rabbitmq_publisher import RabbitMQPublisher
 
@@ -128,6 +128,9 @@ class SimulationEngine:
         # RabbitMQ publisher (spec section 5.2)
         self.rabbitmq_publisher = RabbitMQPublisher()
 
+        # metrics tracker (ustawiany z zewnątrz przez EngineHost gdy experimentLog jest aktywny)
+        self.metrics_tracker = None
+
         # Current state
         self.current_snapshot: Optional[SimulationSnapshot] = None
         self.last_events: List[AgentEvent] = []
@@ -220,6 +223,10 @@ class SimulationEngine:
             previous_sectors=previous_snapshot.sectors,
             current_tick=self.tick_count + 1,
         )
+        if self.metrics_tracker:
+            for event in self.last_events:
+                if event.event_type == AgentEventType.BRIGADE_ARRIVED:
+                    self.metrics_tracker.on_brigade_arrived(event.agent_id, self.tick_count + 1)
 
         # Phase 4: Environment updates (random wind walk, spec section 3.4)
         next_wind, next_temperature = self._phase_environment_update(previous_snapshot)
@@ -293,6 +300,8 @@ class SimulationEngine:
                     if neighbor_next.is_flammable():
                         neighbor_next.state = SectorState.BURNING
                         neighbor_next.fire_level = 0.1  # Initial fire level
+                        if self.metrics_tracker:
+                            self.metrics_tracker.on_ignition(neighbor_id, self.tick_count + 1)
                     # else: log warning if trying to re-ignite already burning sector
             
             # Update fire level per spec section 2.5.1 R3:

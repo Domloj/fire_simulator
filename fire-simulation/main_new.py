@@ -22,6 +22,7 @@ from src.engine.models.fire_propagation import Wind, FirePropagationConfig
 from src.engine.rng_manager import RngManager
 from src.engine.agent_manager import AgentManager, Location as AgentLocation
 from src.engine.sensors import SensorArray, SensorType, SensorConfig
+from src.experiment_logger import ExperimentLogger, SimulationMetricsTracker
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
@@ -38,6 +39,8 @@ class EngineHost:
         self._thread: Optional[threading.Thread] = None
         self.tick_interval: float = 1.0
         self.seed: Optional[int] = None
+        self.exp_logger: Optional[ExperimentLogger] = None
+        self.metrics_tracker: Optional[SimulationMetricsTracker] = None
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -69,11 +72,25 @@ class EngineHost:
             )
             # Assign sensor array for telemetry (spec 5.2.2)
             self.engine.sensor_array = sensor_array
+
+            log_path = config.get("experimentLog")
+            if log_path:
+                self.exp_logger = ExperimentLogger(path=log_path)
+                self.metrics_tracker = SimulationMetricsTracker()
+                self.engine.metrics_tracker = self.metrics_tracker
+            else:
+                self.exp_logger = None
+                self.metrics_tracker = None
+
             self.engine.initialize(
                 seed=self.seed,
                 initial_wind=_parse_wind(map_config.get("wind")),
             )
+            ignite_ids = list(map_config.get("ignite", []) or [])
             _ignite_initial(self.engine, map_config)
+            if self.metrics_tracker:
+                for sid in ignite_ids:
+                    self.metrics_tracker.on_ignition(int(sid), tick=0)
 
             self._stop.clear()
             self._thread = threading.Thread(
@@ -87,16 +104,49 @@ class EngineHost:
             try:
                 with self._lock:
                     self.engine.step()
+                    self._log_current_tick()
             except Exception as exc:
                 logger.exception("Simulation tick failed: %s", exc)
                 break
             time.sleep(self.tick_interval)
+
+    def _log_current_tick(self) -> None:
+        if not self.exp_logger or not self.metrics_tracker or not self.engine:
+            return
+        snap = self.engine.current_snapshot
+        self.exp_logger.record_tick(
+            tick=snap.tick,
+            sectors=snap.sectors,
+            agent_manager=self.agent_manager,
+            orders_this_tick=self.metrics_tracker.flush_orders(),
+            **self.metrics_tracker.snapshot_for_logger(),
+        )
 
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         self._thread = None
+        if self.exp_logger:
+            self.exp_logger.close()
+            self.exp_logger = None
+
+    def record_order(
+        self,
+        action: str,
+        sector_id: Optional[int],
+        tick: int,
+        brigade_id: Optional[int] = None,
+    ) -> None:
+        if not self.metrics_tracker:
+            return
+        order_str = f"{action}:{sector_id or '-'}"
+        if sector_id is not None:
+            self.metrics_tracker.on_order_received(sector_id, tick, order_str)
+        else:
+            self.metrics_tracker._orders_this_tick.append(order_str)
+        if action == "EXTINGUISH" and brigade_id is not None:
+            self.metrics_tracker.on_brigade_dispatched(brigade_id, tick)
 
     def manual_step(self, ticks: int = 1) -> Dict[str, Any]:
         if self.is_running():
@@ -104,6 +154,7 @@ class EngineHost:
         with self._lock:
             for _ in range(ticks):
                 self.engine.step()
+                self._log_current_tick()
             return self.engine.get_snapshot().to_dict()
 
     def snapshot(self) -> Dict[str, Any]:
@@ -224,13 +275,12 @@ def _build_sensor_array(cfg: Dict[str, Any], rng: RngManager) -> SensorArray:
     
     # Register sensors with SensorArray
     for sector_id, sensor_types in sector_sensors.items():
-        sensor_config = SensorConfig(
+        sensor_array.add_sensor(
             sector_id=sector_id,
-            sensor_id=sector_id * 100,  # Simple ID scheme: sector_id * 100
-            enabled_types=sensor_types,
-            location={"lon": 0.0, "lat": 0.0},  # Location will be updated from sector later
+            sensor_id=sector_id * 100,
+            sensor_types=sensor_types,
+            location={"lon": 0.0, "lat": 0.0},
         )
-        sensor_array.add_sensor(sensor_config)
     
     return sensor_array
 
@@ -319,6 +369,12 @@ def order_fire_brigade():
         result = host.agent_manager.apply_brigade_order(
             data, host.engine.current_snapshot.sectors
         )
+        if result.success:
+            brigade_id = data.get("fireBrigadeId")
+            action = data.get("action", "")
+            brigade = host.agent_manager.brigades.get(brigade_id)
+            target_sid = brigade.target_sector_id if brigade else None
+            host.record_order(action, target_sid, host.engine.tick_count, brigade_id=brigade_id)
     code = 200 if result.success else 400
     return jsonify({
         "status": "ok" if result.success else "error",
@@ -336,6 +392,11 @@ def order_forest_patrol():
         result = host.agent_manager.apply_forester_order(
             data, host.engine.current_snapshot.sectors
         )
+        if result.success:
+            action = data.get("action", "")
+            forester = host.agent_manager.foresters.get(data.get("foresterPatrolId"))
+            target_sid = forester.target_sector_id if forester else None
+            host.record_order(action, target_sid, host.engine.tick_count)
     code = 200 if result.success else 400
     return jsonify({
         "status": "ok" if result.success else "error",
