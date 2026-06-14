@@ -13,14 +13,20 @@ Tick lifecycle (section 4.1):
 
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
+from datetime import datetime
 import copy
 import uuid
+import logging
 
 from src.engine.rng_manager import RngManager
 from src.engine.models.sector import Sector, SectorState, SectorType
 from src.engine.models.fire_propagation import FirePropagation, Wind, FirePropagationConfig
 from src.engine.models.event_queue import EventQueue
 from src.engine.agent_manager import AgentManager, AgentEvent
+from src.engine.sensors import SensorArray, SensorType, SensorReading
+from src.messaging.rabbitmq_publisher import RabbitMQPublisher
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -115,6 +121,12 @@ class SimulationEngine:
 
         # Agent manager (spec section 4)
         self.agent_manager = agent_manager or AgentManager()
+
+        # Sensor array (spec section 5.2.2)
+        self.sensor_array = SensorArray(rng=self.rng)
+
+        # RabbitMQ publisher (spec section 5.2)
+        self.rabbitmq_publisher = RabbitMQPublisher()
 
         # Current state
         self.current_snapshot: Optional[SimulationSnapshot] = None
@@ -212,11 +224,18 @@ class SimulationEngine:
         # Phase 4: Environment updates (random wind walk, spec section 3.4)
         next_wind, next_temperature = self._phase_environment_update(previous_snapshot)
         
-        # Phase 5: Telemetry generation (TODO - integrate with messaging)
-        # telemetry = self._generate_telemetry(next_sectors)
+        # Phase 5: Telemetry generation (spec section 5.2)
+        timestamp = datetime.utcnow().isoformat() + "Z"
+        telemetry_data = self._phase_telemetry_generation(
+            next_sectors=next_sectors,
+            previous_sectors=previous_snapshot.sectors,
+            wind=next_wind,
+            temperature=next_temperature,
+            timestamp=timestamp
+        )
         
-        # Phase 6: RabbitMQ publication (TODO - integrate with messaging)
-        # self._publish_telemetry(telemetry)
+        # Phase 6: RabbitMQ publication (spec section 5.2)
+        self._phase_rabbitmq_publication(telemetry_data)
         
         # Phase 7: Commit next state
         self.tick_count += 1
@@ -358,3 +377,167 @@ class SimulationEngine:
         sector.state = SectorState.BURNING
         sector.fire_level = 0.1
         return True
+    
+    def _phase_telemetry_generation(self,
+                                     next_sectors: Dict[int, Sector],
+                                     previous_sectors: Dict[int, Sector],
+                                     wind: Wind,
+                                     temperature: float,
+                                     timestamp: str) -> Dict[str, Any]:
+        """
+        Phase 5: Telemetry generation (spec section 5.2).
+        
+        Generates:
+        - Sector state telemetry (full and fast variant)
+        - Sensor readings
+        - Agent state telemetry
+        
+        Args:
+            next_sectors: Updated sectors after fire propagation
+            previous_sectors: Previous sector states
+            wind: Current wind state
+            temperature: Current temperature
+            timestamp: ISO timestamp
+        
+        Returns:
+            Telemetry data dict with keys: sectors, sensors, agents
+        """
+        telemetry = {
+            "sectors": [],
+            "sectors_fast": [],  # Only changed sectors
+            "sensors": [],
+            "agents": [],
+        }
+        
+        # Sector state telemetry (spec 5.2.1)
+        for sector_id, sector in next_sectors.items():
+            sector_telemetry = {
+                "sectorId": sector_id,
+                "fireLevel": sector.fire_level,
+                "burnLevel": sector.burn_level,
+                "extinguishLevel": sector.extinguish_level,
+                "fireState": sector.get_fire_state_name(),
+            }
+            telemetry["sectors"].append(sector_telemetry)
+            
+            # Fast variant: only if state changed
+            prev_sector = previous_sectors[sector_id]
+            if (prev_sector.fire_level != sector.fire_level or
+                prev_sector.burn_level != sector.burn_level or
+                prev_sector.extinguish_level != sector.extinguish_level or
+                prev_sector.state != sector.state):
+                telemetry["sectors_fast"].append(sector_telemetry)
+        
+        # Sensor readings (spec 5.2.2)
+        sensor_readings = self.sensor_array.read_all(
+            timestamp=timestamp,
+            wind_speed=wind.speed,
+            wind_direction=wind.direction_degrees,
+            global_temperature=temperature
+        )
+        for reading in sensor_readings:
+            telemetry["sensors"].append(reading.to_dict())
+        
+        # Agent telemetry (spec 5.2.3)
+        agents_dict = self.agent_manager.to_dict()
+        
+        # Fire brigades
+        brigades = []
+        for brigade_data in agents_dict.get("brigades", []):
+            brigade_telemetry = {
+                "fireBrigadeId": brigade_data.get("agent_id"),
+                "state": brigade_data.get("state", "AVAILABLE"),
+                "timestamp": timestamp,
+                "location": brigade_data.get("location", {"lon": 0.0, "lat": 0.0}),
+                "sectorId": brigade_data.get("sector_id"),
+            }
+            brigades.append(brigade_telemetry)
+        
+        telemetry["agents"].append({
+            "type": "fire_brigades",
+            "data": brigades
+        })
+        
+        # Foresters
+        foresters = []
+        for forester_data in agents_dict.get("foresters", []):
+            forester_telemetry = {
+                "foresterPatrolId": forester_data.get("agent_id"),
+                "state": forester_data.get("state", "AVAILABLE"),
+                "timestamp": timestamp,
+                "location": forester_data.get("location", {"lon": 0.0, "lat": 0.0}),
+                "sectorId": forester_data.get("sector_id"),
+            }
+            foresters.append(forester_telemetry)
+        
+        telemetry["agents"].append({
+            "type": "foresters",
+            "data": foresters
+        })
+        
+        return telemetry
+    
+    def _phase_rabbitmq_publication(self, telemetry_data: Dict[str, Any]) -> None:
+        """
+        Phase 6: RabbitMQ publication (spec section 5.2).
+        
+        Publishes telemetry to fire_updates exchange per spec routing keys.
+        
+        Args:
+            telemetry_data: Telemetry dict from Phase 5
+        """
+        if not self.rabbitmq_publisher.available:
+            logger.debug("RabbitMQ unavailable, skipping publication")
+            return
+        
+        # Publish full sector states (spec 5.2.1)
+        for sector_data in telemetry_data.get("sectors", []):
+            self.rabbitmq_publisher.publish_sector_state(sector_data)
+        
+        # Publish fast sector states (only changed)
+        for sector_data in telemetry_data.get("sectors_fast", []):
+            self.rabbitmq_publisher.publish(
+                routing_key="simulation.telemetry.map.sector_state_fast",
+                message=sector_data
+            )
+        
+        # Publish sensor readings (spec 5.2.2)
+        for sensor_reading in telemetry_data.get("sensors", []):
+            self.rabbitmq_publisher.publish_sensor_reading(
+                sensor_type=sensor_reading.get("sensorType"),
+                sensor_id=sensor_reading.get("sensorId"),
+                location=sensor_reading.get("location"),
+                data=sensor_reading.get("data"),
+                timestamp=sensor_reading.get("timestamp")
+            )
+        
+        # Publish agent states (spec 5.2.3)
+        for agent_batch in telemetry_data.get("agents", []):
+            agent_type = agent_batch.get("type")
+            agent_data = agent_batch.get("data", [])
+            
+            if agent_type == "fire_brigades":
+                # Publish individual brigade states
+                for brigade in agent_data:
+                    self.rabbitmq_publisher.publish_fire_brigade_state(
+                        brigade_id=brigade.get("fireBrigadeId"),
+                        state=brigade.get("state"),
+                        location=brigade.get("location"),
+                        sector_id=brigade.get("sectorId"),
+                        timestamp=brigade.get("timestamp")
+                    )
+                # Also publish batch variant
+                self.rabbitmq_publisher.publish_fire_brigade_batch(agent_data)
+            
+            elif agent_type == "foresters":
+                # Publish individual forester states
+                for forester in agent_data:
+                    self.rabbitmq_publisher.publish_forester_state(
+                        forester_id=forester.get("foresterPatrolId"),
+                        state=forester.get("state"),
+                        location=forester.get("location"),
+                        sector_id=forester.get("sectorId"),
+                        timestamp=forester.get("timestamp")
+                    )
+                # Also publish batch variant
+                self.rabbitmq_publisher.publish_forester_batch(agent_data)
