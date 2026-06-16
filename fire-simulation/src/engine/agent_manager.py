@@ -359,13 +359,19 @@ class AgentManager:
                 self._patrol_dwell[forester.agent_id] = 0
 
         # Sektory zajęte przez innych leśników (cel albo aktualnie patrolowany) —
-        # nie chcemy, by kilku zbiegło się na ten sam.
+        # nie chcemy, by kilku zbiegło się na ten sam. Zbieramy też ich
+        # lokalizacje, żeby nowe cele wybierać z dala od nich (rozpraszanie).
         occupied: set = set()
+        claimed_locations: List[Location] = []
         for f in self.foresters.values():
-            if f.target_sector_id is not None:
-                occupied.add(f.target_sector_id)
-            if f.state == AgentState.PATROLLING and f.current_sector_id is not None:
-                occupied.add(f.current_sector_id)
+            for sid in (f.target_sector_id,
+                        f.current_sector_id if f.state == AgentState.PATROLLING else None):
+                if sid is None:
+                    continue
+                occupied.add(sid)
+                s = next_sectors.get(sid)
+                if s is not None and s.longitude is not None and s.latitude is not None:
+                    claimed_locations.append(Location(lon=s.longitude, lat=s.latitude))
 
         for forester in self.foresters.values():
             idle = forester.state == AgentState.AVAILABLE
@@ -378,7 +384,9 @@ class AgentManager:
             if not (idle or done_dwelling):
                 continue
 
-            target_id = self._pick_patrol_target(forester, next_sectors, occupied)
+            target_id = self._pick_patrol_target(
+                forester, next_sectors, occupied, claimed_locations
+            )
             if target_id is None:
                 continue
 
@@ -394,6 +402,7 @@ class AgentManager:
             self._patrol_dwell[forester.agent_id] = 0
             self._autonomous_patrol.add(forester.agent_id)
             occupied.add(target_id)  # kolejny leśnik w tym ticku już go nie wybierze
+            claimed_locations.append(forester.target_location)  # następny wybierze z dala
             events.append(AgentEvent(
                 tick=current_tick,
                 event_type=AgentEventType.FORESTER_DISPATCHED,
@@ -406,15 +415,19 @@ class AgentManager:
     def _pick_patrol_target(self,
                             forester: "ForesterPatrol",
                             next_sectors: Dict[int, "Sector"],
-                            occupied: set) -> Optional[int]:
+                            occupied: set,
+                            claimed_locations: List[Location]) -> Optional[int]:
         """
         Wybiera sektor do patrolowania: najdawniej obserwowany (nigdy = najstarszy),
-        palny, nie płonący i nie zajęty przez innego leśnika. Remis rozstrzyga
-        bliskość do leśnika, żeby skrócić dojazd.
+        palny, nie płonący i nie zajęty przez innego leśnika.
+
+        Remis wieku rozstrzyga rozpraszanie: preferujemy sektor jak najdalej od
+        pozostałych patroli, żeby leśnicy rozeszli się po mapie zamiast zbiegać
+        w jeden region. Dopiero na końcu liczy się krótki dojazd własny.
         """
         here = forester.get_current_location()
         best_id: Optional[int] = None
-        best_key: Optional[Tuple[int, float]] = None
+        best_key: Optional[Tuple[int, float, float]] = None
 
         for sid, sector in next_sectors.items():
             if sid in occupied:
@@ -423,9 +436,13 @@ class AgentManager:
                 continue
             if not sector.is_flammable():   # DORMANT, ma paliwo, nie woda
                 continue
+            loc = Location(lon=sector.longitude, lat=sector.latitude)
             last = self._sector_last_patrolled.get(sid, -1)   # nigdy widziany = -1
-            dist = here.distance_to(Location(lon=sector.longitude, lat=sector.latitude))
-            key = (last, dist)              # najpierw najstarszy, potem najbliższy
+            # odległość do najbliższego innego patrolu — im większa, tym lepiej
+            spread = min((loc.distance_to(o) for o in claimed_locations), default=float("inf"))
+            own = here.distance_to(loc)
+            # najstarszy → najdalej od innych (−spread rośnie) → najbliżej siebie
+            key = (last, -spread, own)
             if best_key is None or key < best_key:
                 best_key = key
                 best_id = sid
