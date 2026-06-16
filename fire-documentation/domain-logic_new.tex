@@ -183,103 +183,104 @@ Maps (Sectors) to główna baza danych zawierająca definicje obszarów monitoro
 
 
 
-Sektor może znajdować się w jednym z trzech stanów:
+Sektor może znajdować się w jednym z czterech stanów:
 \begin{itemize}
-    \item \textbf{INACTIVE} -- brak ognia
-    \item \textbf{ACTIVE} -- aktywny pożar
-    \item \textbf{LOST} -- sektor całkowicie spalony (burn level $\geq$ 100\%)
+    \item \textbf{DORMANT} -- sektor nie płonie (gotowy do zapłonu)
+    \item \textbf{BURNING} -- aktywny pożar
+    \item \textbf{EXTINGUISHED} -- pożar ugaszony przez brygadę
+    \item \textbf{ASH} -- sektor wypalony, paliwo wyczerpane (stan nieodwracalny)
+\end{itemize}
+
+Przejścia między stanami:
+\begin{itemize}
+    \item DORMANT $\rightarrow$ BURNING -- zapłon,
+    \item BURNING $\rightarrow$ ASH -- wypalenie paliwa,
+    \item BURNING $\rightarrow$ EXTINGUISHED -- skuteczne gaszenie,
+    \item EXTINGUISHED $\rightarrow$ ASH -- stan terminalny w przepływie silnika.
 \end{itemize}
 
 \subsubsection{Parametry sektora}
 
+Silnik operuje na znormalizowanych parametrach z zakresu $[0,1]$:
 \begin{itemize}
-    \item \textbf{fireLevel} (0-100): Intensywność ognia
-    \item \textbf{burnLevel} (0-100): Procent spalenia sektora
-    \item \textbf{extinguishLevel} (0-100): Postęp gaszenia
-    \item \textbf{temperature}: Temperatura w stopniach Celsjusza
-    \item \textbf{airHumidity}: Wilgotność powietrza (0-100\%)
-    \item \textbf{windSpeed}: Prędkość wiatru (m/s)
-    \item \textbf{windDirection}: Kierunek wiatru (0-360 stopni)
-    \item \textbf{litterMoisture}: Wilgotność ściółki (0-100\%)
-    \item \textbf{co2Concentration}: Stężenie CO2 (ppm)
-    \item \textbf{pm2\_5Concentration}: Stężenie PM2.5 ($\mu$g/m³)
+    \item \textbf{fireLevel} $\in [0,1]$: intensywność ognia
+    \item \textbf{burnLevel} $\in [0,1]$: skumulowany poziom spalenia
+    \item \textbf{extinguishLevel} $\in [0,1]$: postęp gaszenia
+    \item \textbf{moisture} $\in [0,1]$: wilgotność sektora (obniża prawdopodobieństwo zapłonu)
+    \item \textbf{fuel} $\in [0,1]$: dostępne paliwo (zużywane podczas palenia)
+    \item \textbf{temperature}: temperatura lokalna sektora (°C)
+    \item \textbf{sectorType}: typ sektora (zob. sekcja \ref{sec:alpha})
 \end{itemize}
+
+Pozostałe wielkości środowiskowe (wilgotność powietrza, stężenie CO\textsubscript{2}, PM2.5, prędkość i kierunek wiatru) nie są przechowywane na sektorze jako stan symulacji, lecz wyznaczane na bieżąco w warstwie sensorów przy generowaniu telemetrii (zob. sekcja~\ref{sec:sensors-fire}).
 
 \subsection{Aktualizacja poziomu ognia}
 
-Poziom ognia w sektorze jest aktualizowany w każdym ticku symulacji zgodnie z formułą:
+Poziom ognia w płonącym sektorze rośnie w każdym ticku o stały przyrost, modyfikowany typem sektora:
 
 \begin{equation}
-fireLevel_{t+1} = \min(fireLevel_t + \frac{fireLevel_t}{10} \cdot \alpha \cdot F - extinguishLevel_t, 100)
+fireLevel_{t+1} = \mathrm{clamp}\!\left(fireLevel_t + spreadRate \cdot \alpha,\ 0,\ 1\right)
 \end{equation}
 
 gdzie:
 \begin{itemize}
-    \item $\alpha$ -- współczynnik typu sektora (zob. sekcja \ref{sec:alpha})
-    \item $F$ -- stała mnożnika poziomu ognia (domyślnie 1.0)
-    \item $extinguishLevel_t$ -- poziom gaszenia w chwili $t$
+    \item $spreadRate$ -- bazowy przyrost ognia na tick (domyślnie 0,04)
+    \item $\alpha$ -- współczynnik palności typu sektora (zob. sekcja \ref{sec:alpha})
 \end{itemize}
 
-Jeśli $fireLevel_{t+1} \leq 0$, sektor przechodzi w stan \textbf{INACTIVE}.
+Efekty wiatru i temperatury nie wchodzą do tej formuły -- są uwzględniane wyłącznie na etapie prawdopodobieństwa zapłonu sąsiada (sekcja~\ref{sec:ignition}). Wartość 0,04 rozkłada eskalację równomiernie na stopnie klasyfikacji 1--4 (zob. sekcja~\ref{sec:fire-threat-enums}).
 
 \subsection{Aktualizacja poziomu spalenia}
 
-Poziom spalenia (burn level) jest aktualizowany zgodnie z formułą:
+Poziom spalenia (burn level) akumuluje się proporcjonalnie do bieżącej intensywności ognia:
 
 \begin{equation}
-burnLevel_{t+1} = \min(burnLevel_t + 0.00005 \cdot fireLevel_t^3, 100)
+burnLevel_{t+1} = \mathrm{clamp}\!\left(burnLevel_t + 0{,}1 \cdot fireLevel_t,\ 0,\ 1\right)
 \end{equation}
 
-Jeśli $burnLevel_{t+1} \geq 100$, sektor przechodzi w stan \textbf{LOST} i $fireLevel$ jest ustawiany na 0.
+Niezależnie od poziomu spalenia, o przejściu sektora w stan terminalny decyduje wyczerpanie paliwa: gdy $fuel \leq \varepsilon$, sektor przechodzi w stan \textbf{ASH}.
 
 \subsection{Poziom gaszenia}
 
-Poziom gaszenia zależy od liczby brygad pożarniczych w sektorze:
+Poziom gaszenia nie jest funkcją chwilową, lecz akumuluje się w czasie. Każda brygada obecna w sektorze i będąca w stanie gaszenia podnosi go o stały przyrost na tick:
 
 \begin{equation}
-extinguishLevel_t = n_{brigades} \cdot M
+extinguishLevel_{t+1} = extinguishLevel_t + n_{brigades} \cdot extinguishRate
 \end{equation}
 
-gdzie:
-\begin{itemize}
-    \item $n_{brigades}$ -- liczba brygad pożarniczych w sektorze
-    \item $M$ -- stała mnożnika gaszenia (domyślnie 1.0)
-\end{itemize}
+gdzie $n_{brigades}$ to liczba gaszących brygad, a $extinguishRate$ to przyrost na brygadę (domyślnie 0,05). Gdy $extinguishLevel \geq 1$, pożar uznaje się za ugaszony i sektor przechodzi w stan \textbf{EXTINGUISHED}.
 
-\subsection{Wpływ ognia na parametry środowiskowe}
+\subsection{Zużycie paliwa}
 
-\subsubsection{Temperatura}
-
-Temperatura w sektorze jest aktualizowana zgodnie z formułą:
+Paliwo jest zużywane w tempie zależnym od klasyfikacji pożaru (Tabela~1 z artykułu Klimka): im intensywniejszy pożar, tym szybciej wypala paliwo.
 
 \begin{equation}
-T_{t+1} = T_t + (T_{target} - T_t) \cdot 0.5 - T_t \cdot 0.02 + \epsilon
+fuel_{t+1} = \max\!\left(fuel_t - fuelRate \cdot m_{level},\ 0\right)
 \end{equation}
 
-gdzie:
-\begin{itemize}
-    \item $T_{target} = T_{initial} + fireLevel \cdot 0.5$ -- docelowa temperatura
-    \item $\epsilon \sim U(-0.5, 0.5)$ -- losowa zmiana
-    \item $T_{initial}$ -- początkowa temperatura sektora
-\end{itemize}
+gdzie $fuelRate$ to bazowe tempo (domyślnie 0,02), a $m_{level}$ to mnożnik zależny od stopnia pożaru: 0,5 (stopień 1), 1,0 (stopień 2), 2,0 (stopień 3) oraz 4,0 (stopień 4).
 
-Temperatura jest ograniczona do zakresu $[10, T_{initial} + 80]$.
+\subsection{Wpływ ognia na odczyty sensorów}
+\label{sec:sensors-fire}
 
-\subsubsection{Wilgotność powietrza}
+Silnik nie ewoluuje parametrów środowiskowych jako osobnego stanu sektora. Wpływ pożaru na otoczenie ujawnia się dopiero w warstwie sensorów (faza generacji telemetrii): odczyt sensora stojącego na płonącym sektorze rośnie proporcjonalnie do poziomu ognia $\ell \in [0,1]$. Każdy odczyt to wartość bazowa plus szum (deterministyczny, generowany przez wspólny RNG) plus dorzut od pożaru.
 
-\begin{equation}
-H_{t+1} = \max(H_t - fireLevel \cdot 0.4 + \epsilon, 5)
-\end{equation}
+\begin{table}[h!]
+\centering
+\caption{Wpływ pożaru na odczyty sensorów (przy $\ell = 1{,}0$)}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Sensor} & \textbf{Baseline} & \textbf{Dorzut od pożaru} \\ \hline
+Temperatura          & $T_{global}$ & $+45$ °C \\ \hline
+Wilgotność powietrza & 0,5          & $-0{,}35$ \\ \hline
+Wilgotność ściółki   & 0,3          & $-0{,}25$ \\ \hline
+CO\textsubscript{2}  & 400 ppm      & $+3000$ ppm \\ \hline
+PM2.5                & 35 µg/m³     & $+450$ µg/m³ \\ \hline
+Kamera (dym)         & 5\% szumu    & prawdop. detekcji $\approx 0{,}05 + 0{,}9\,\ell$ \\ \hline
+\end{tabular}
+\end{table}
 
-gdzie $\epsilon \sim U(-2, 2)$.
-
-\subsubsection{Stężenie CO2}
-
-\begin{equation}
-CO2_{t+1} = \max(CO2_t + fireLevel^{1.1} - CO2_t \cdot 0.01 + \epsilon, 300)
-\end{equation}
-
-gdzie $\epsilon \sim U(-5, 5)$.
+Wartości dorzutu dobrano tak, aby płonący sektor wyraźnie przebijał progi wykrywania w silniku (CO\textsubscript{2} $> 800$ ppm, PM2.5 $> 100$ µg/m³, temperatura $> 45$ °C), co stanowi podstawę detekcji pożaru przez sieć czujników (sekcja~\ref{sec:detection}).
 
 \section{Rozprzestrzenianie się ognia}
 
@@ -292,59 +293,60 @@ Ogień rozprzestrzenia się z sektora aktywnego do sąsiednich sektorów z prawd
     \item Kierunku geograficznego względem wiatru
 \end{itemize}
 
-\subsection{Współczynnik rozprzestrzeniania $\beta$}
+\subsection{Prawdopodobieństwo zapłonu}
+\label{sec:ignition}
 
-Prawdopodobieństwo zapalenia się sąsiedniego sektora obliczane jest jako:
+Dla każdej pary (płonący sąsiad, sektor docelowy) silnik wyznacza prawdopodobieństwo zapłonu jako iloczyn czynników, przeskalowany globalnym współczynnikiem rozprzestrzeniania:
 
 \begin{equation}
-\beta = \min(\frac{windSpeed}{40} \cdot \alpha_{target} \cdot directionCoef, 1)
+p_{ign} = \mathrm{clamp}\!\Big(0,\ 1,\ \ s \cdot f \cdot (1 - m) \cdot w_{\theta} \cdot \ell_{sąsiad} \cdot \max(0,\ 1 + \beta (T - T_{ref}))\Big)
 \end{equation}
 
 gdzie:
 \begin{itemize}
-    \item $windSpeed$ -- prędkość wiatru (m/s)
-    \item $\alpha_{target}$ -- współczynnik typu sektora docelowego (zob. sekcja \ref{sec:alpha})
-    \item $directionCoef$ -- współczynnik kierunkowy (zob. sekcja \ref{sec:direction})
+    \item $s$ -- globalny współczynnik rozprzestrzeniania (domyślnie 0,2); bez niego ogień przy $m=0$ zajmowałby każdego sąsiada deterministycznie,
+    \item $f$ -- paliwo sektora docelowego, $m$ -- jego wilgotność,
+    \item $w_{\theta}$ -- składowa wiatru (zob. niżej),
+    \item $\ell_{sąsiad}$ -- poziom ognia płonącego sąsiada,
+    \item $T$ -- temperatura globalna, $T_{ref}$ -- temperatura odniesienia (20 °C), $\beta$ -- współczynnik temperaturowy (0,02).
 \end{itemize}
+
+O faktycznym zapłonie decyduje losowanie: sektor zajmuje się ogniem, gdy $\xi < p_{ign}$, $\xi \sim U(0,1)$ ze wspólnego RNG. Sektor świeżo zapalony otrzymuje początkowy $fireLevel = 0{,}1$.
+
+\subsubsection*{Składowa wiatru $w_{\theta}$}
+
+Wiatr nie jest dyskretnym współczynnikiem kierunkowym, lecz ciągłą funkcją kąta między kierunkiem wiatru a kierunkiem rozprzestrzeniania:
+
+\begin{equation}
+w_{\theta} = 1 + \alpha_{w} \cdot \|w\| \cdot \cos\theta
+\end{equation}
+
+gdzie $\|w\|$ to prędkość wiatru (km/h, bez normalizacji), $\theta$ to kąt między wiatrem a kierunkiem do sektora docelowego, a $\alpha_{w}$ to współczynnik wpływu wiatru (domyślnie 0,01). Wiatr wiejący w stronę sektora ($\cos\theta > 0$) zwiększa prawdopodobieństwo, przeciwny ($\cos\theta < 0$) je zmniejsza.
 
 \subsection{Współczynnik typu sektora $\alpha$}
 \label{sec:alpha}
 
-Współczynnik $\alpha$ zależy od typu sektora:
+Współczynnik palności $\alpha$ zależy od typu roślinności sektora i wchodzi do przyrostu poziomu ognia (sekcja~\ref{sec:fire-threat-enums}):
 \begin{itemize}
-    \item \textbf{FOREST:} $\alpha = 1.0$ (najwyższe ryzyko)
-    \item \textbf{GRASS:} $\alpha = 0.8$
-    \item \textbf{BUILDING:} $\alpha = 0.3$
+    \item \textbf{FIELD:} $\alpha = 1.5$
+    \item \textbf{CONIFEROUS:} $\alpha = 1.2$
+    \item \textbf{FALLOW:} $\alpha = 1.2$
+    \item \textbf{MIXED:} $\alpha = 1.0$
+    \item \textbf{UNTRACKED:} $\alpha = 1.0$
+    \item \textbf{DECIDUOUS:} $\alpha = 0.8$
     \item \textbf{WATER:} $\alpha = 0.0$ (niepalne)
-\end{itemize}
-
-\subsection{Współczynnik kierunkowy}
-\label{sec:direction}
-
-Współczynnik kierunkowy zależy od różnicy między kierunkiem wiatru a kierunkiem do sąsiedniego sektora:
-
-\begin{equation}
-diff = \min(|windDirection - sectorDirection|, 8 - |windDirection - sectorDirection|)
-\end{equation}
-
-Wartości współczynnika:
-\begin{itemize}
-    \item $diff = 0$: $directionCoef = 0.8$
-    \item $diff = 1$: $directionCoef = 0.5$
-    \item $diff = 2$: $directionCoef = 0.25$
-    \item $diff = 3$: $directionCoef = 0.1$
-    \item $diff = 4$: $directionCoef = 0.05$
-    \item $diff > 4$: $directionCoef = 0.0$
 \end{itemize}
 
 \subsection{Model wiatru}
 
-Wiatr jest modelowany jako dynamiczny parametr, który zmienia się w czasie:
+Wiatr jest globalnym parametrem ewoluującym losowo (faza aktualizacji środowiska). W każdym ticku prędkość i kierunek podlegają niewielkiemu błądzeniu losowemu:
 
 \begin{itemize}
-    \item \textbf{Prędkość wiatru:} $windSpeed_{t+1} = \max(0, windSpeed_t + \epsilon)$ gdzie $\epsilon \sim U(-2.5, 2.5)$
-    \item \textbf{Kierunek wiatru:} zmienia się losowo o -1, 0 lub +1 jednostkę w każdym ticku (cyklicznie, 1-8)
+    \item \textbf{Prędkość:} $\|w\|_{t+1} = \mathrm{clamp}(\|w\|_t + \epsilon,\ 0,\ 80)$, $\epsilon \sim U(-1, 1)$ km/h,
+    \item \textbf{Kierunek:} $dir_{t+1} = (dir_t + \delta) \bmod 360$, $\delta \sim U(-5, 5)$ stopni.
 \end{itemize}
+
+Kierunek wyrażany jest w stopniach (0° = północ, 90° = wschód, 180° = południe, 270° = zachód), a sąsiedztwo jest 4-spójne (północ, wschód, południe, zachód, bez przekątnych).
 
 \section{Baza danych Maps}
 
@@ -910,14 +912,19 @@ Struktura modułu \textit{Forest Protection \& Fire Processing} w zakresie obsł
 
 
 \subsection{Algorytmy wykrywania zagrożeń}
+\label{sec:detection}
 
-System analizuje dane środowiskowe w sposób cykliczny, w konfigurowalnym interwale czasowym (np. co 5 sekund).
+System analizuje dane środowiskowe w sposób cykliczny, w konfigurowalnym interwale czasowym.
 
-Proces wykrywania oraz modelowania rozprzestrzeniania się pożaru opiera się na probabilistycznym modelu Monte Carlo. Dla każdego sektora znajdującego się w stanie pożaru analizowane są sektory sąsiednie, a prawdopodobieństwo zapalenia się danego sektora obliczane jest za pomocą funkcji \texttt{calculate\_beta()}, która uwzględnia zmienne pogodowe, ukształtowanie terenu oraz położenie geograficzne sektorów.
+Modelowanie rozprzestrzeniania się pożaru opiera się na modelu probabilistycznym: dla każdego płonącego sektora analizowane są sektory sąsiednie, a prawdopodobieństwo zapłonu wyznacza funkcja \texttt{calculate\_ignition\_probability()} uwzględniająca paliwo, wilgotność, wiatr oraz temperaturę (sekcja~\ref{sec:ignition}).
 
-Każdy sektor monitoruje swój aktualny stan na podstawie danych pochodzących z przypisanych sensorów.
+Detekcja pożaru nie polega na bezpośrednim odczycie stanu sektora, lecz na danych z sieci czujników. Symulator publikuje pełny stan jedynie tych sektorów, które zostały faktycznie wykryte:
+\begin{itemize}
+    \item przez czujnik, którego odczyt przebił próg detekcji (CO\textsubscript{2} $> 800$ ppm, PM2.5 $> 100$ µg/m³, temperatura $> 45$ °C lub kamera wykryła dym), albo
+    \item przez patrol leśników znajdujący się w pobliżu płonącego sektora.
+\end{itemize}
 
-Detekcja zagrożenia polega na obserwowaniu zmian stanu sektorów, w szczególności przejścia sektora ze stanu \texttt{INACTIVE} do stanu \texttt{ACTIVE}.
+Sektory płonące, lecz jeszcze niewykryte, są maskowane w danych dla modułu wsparcia (publikowane jako \texttt{DORMANT}). Dzięki temu logika decyzyjna reaguje dopiero na potwierdzone wykrycie, a nie na wszechwiedzę o stanie mapy.
 
 \subsection{Klasyfikacja stanu pożaru oraz poziom zagrożenia sektora}
 \label{sec:fire-threat-enums}
@@ -1209,7 +1216,7 @@ System wykorzystuje trzy strategie nagród, które różnią się wagami przypis
 \subsubsection{Komponenty nagród i kar}
 
 \begin{itemize}
-    \item \textbf{LOST\_SECTOR\_PENALTY} -- kara za utracone sektory (burn level $\geq$ 100\%)
+    \item \textbf{LOST\_SECTOR\_PENALTY} -- kara za utracone sektory (stan \texttt{ASH})
     \item \textbf{EXTINGUISHED\_FIRES\_REWARD} -- nagroda za ugaszone pożary
     \item \textbf{SPREAD\_PREVENTION\_REWARD} -- nagroda za zapobieganie rozprzestrzenianiu
     \item \textbf{BURNED\_SECTOR\_PENALTY} -- kara proporcjonalna do poziomu spalenia
@@ -1262,8 +1269,8 @@ rewards = extinguishedCount \cdot EXTINGUISHED\_REWARD + firebreakCount \cdot SP
 
 Symulacja MCTS kończy się, gdy:
 \begin{itemize}
-    \item Wszystkie pożary zostały ugaszone (fireState = INACTIVE dla wszystkich sektorów)
-    \item Wszystkie sektory zostały utracone (fireState = LOST dla wszystkich sektorów)
+    \item Wszystkie pożary zostały ugaszone (żaden sektor nie jest w stanie \texttt{BURNING})
+    \item Wszystkie zagrożone sektory zostały utracone (stan \texttt{ASH})
     \item Osiągnięto maksymalną liczbę kroków symulacji
 \end{itemize}
 
@@ -1283,7 +1290,7 @@ Symulacja MCTS kończy się, gdy:
 Patrole leśne używają heurystyki zamiast MCTS do wyboru sektorów do patrolowania:
 
 \begin{enumerate}
-    \item \textbf{Filtrowanie:} Ignorowane są sektory z aktywnym pożarem (fireState = ACTIVE)
+    \item \textbf{Filtrowanie:} Ignorowane są sektory z aktywnym pożarem (stan \texttt{BURNING})
     \item \textbf{Priorytetyzacja:} Priorytet mają "starsze" sektory -- te, które nie były patrolowane najdłużej
     \item \textbf{Wybór:} Każdy patrol wybiera inny sektor (brak duplikatów)
 \end{enumerate}
