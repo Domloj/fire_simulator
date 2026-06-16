@@ -70,9 +70,11 @@ class AgentPositionController {
         const initialPrev = prev ? prev : { id, unitType: resolvedUnitType ?? undefined, state: state ?? undefined, lng, lat, t: now - 50 } as Pos;
         this.positions.set(key, { id, unitType: resolvedUnitType ?? undefined, state: state ?? undefined, lng, lat, t: now, prev: initialPrev });
 
-        for (const alt of ['u', 'fireBrigade', 'foresterPatrol']) {
-          if (alt !== usedPrefix) this.positions.delete(`${alt}:${id}`);
-        }
+        // Sprzątamy tylko placeholder nieznanego typu (u:id) po rozpoznaniu typu.
+        // NIE kasujemy drugiego realnego typu o tym samym id — brygady i patrole
+        // mają nakładające się id (0..7), więc kasowanie "fireBrigade:0" przy
+        // patrolu o id 0 usuwało brygadę z mapy (raz widać, potem znika).
+        if (usedPrefix !== 'u') this.positions.delete(`u:${id}`);
       }
 
       if (this.subscribers.size > 0 && !this.running) {
@@ -125,9 +127,10 @@ class AgentPositionController {
       const state = p.state ?? null;
       const initialPrev = prev ? prev : { id, unitType: inferredUnitType ?? undefined, state: state ?? undefined, lng, lat, t: now - 50 } as Pos;
       this.positions.set(key, { id, unitType: inferredUnitType ?? undefined, state: state ?? undefined, lng, lat, t: now, prev: initialPrev });
-      for (const alt of ['u', 'fireBrigade', 'foresterPatrol']) {
-        if (alt !== (inferredUnitType ?? 'u')) this.positions.delete(`${alt}:${id}`);
-      }
+      // Tylko placeholder nieznanego typu (u:id); NIE kasujemy drugiego realnego
+      // typu o tym samym id — brygady i patrole mają nakładające się id (0..7).
+      const resolvedPrefix = inferredUnitType ?? 'u';
+      if (resolvedPrefix !== 'u') this.positions.delete(`u:${id}`);
     }
 
     if (this.subscribers.size > 0 && !this.running) {
