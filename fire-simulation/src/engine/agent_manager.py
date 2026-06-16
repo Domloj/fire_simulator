@@ -647,7 +647,15 @@ class AgentManager:
                 f"Nieznana akcja '{action}' dla ForesterPatrol"
             )
 
-        # Support/operator przejmuje sterowanie tym leśnikiem — autonomiczny
+        # Gdy patrol autonomiczny jest włączony, ignorujemy rozkazy PATROL z
+        # zewnątrz. Support rekomenduje leśnikom słabe cele (heurystyka bez
+        # tie-breakingu zbija ich w sektory o najniższych ID, czyli w jeden róg
+        # mapy), a leśnikami i tak lepiej steruje rozproszony patrol symulatora.
+        # GO_TO_BASE działa dalej, żeby auto-withdraw i odwołanie do bazy żyło.
+        if action == "PATROL" and self.config.proactive_patrol:
+            return OrderResult.ok()
+
+        # Operator/support przejmuje sterowanie tym leśnikiem — autonomiczny
         # patrol przestaje go ruszać, dopóki nie wróci do bazy.
         self._autonomous_patrol.discard(forester_id)
 
