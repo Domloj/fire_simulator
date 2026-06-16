@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import Flask, request, jsonify
 
@@ -41,15 +41,19 @@ class EngineHost:
         self.seed: Optional[int] = None
         self.exp_logger: Optional[ExperimentLogger] = None
         self.metrics_tracker: Optional[SimulationMetricsTracker] = None
+        self._support_config: Optional[Dict[str, Any]] = None
+        self._support_config_republish: int = 0
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
     def start(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        with self._lock:
-            if self.is_running():
-                raise RuntimeError("Simulation already running")
+        # Kolejny start zastępuje poprzednią sesję. Zatrzymujemy ją przed
+        # wzięciem locka, bo stop() czeka na wątek pętli, który sam bierze lock.
+        if self.is_running():
+            self.stop()
 
+        with self._lock:
             self.seed = config.get("seed")
             self.tick_interval = float(
                 config.get("tickInterval", config.get("tick_interval", 1.0))
@@ -73,6 +77,13 @@ class EngineHost:
             # Assign sensor array for telemetry (spec 5.2.2)
             self.engine.sensor_array = sensor_array
 
+            # Wykrywanie pożaru (Krok 3): domyślnie support widzi sektor dopiero
+            # po wykryciu przez sensor/patrol. Można wyłączyć configiem, np. do
+            # eksperymentów porównawczych (support znów ma pełną wiedzę).
+            self.engine.detection_enabled = bool(
+                config.get("detection", map_config.get("detection", True))
+            )
+
             log_path = config.get("experimentLog")
             if log_path:
                 self.exp_logger = ExperimentLogger(path=log_path)
@@ -86,11 +97,23 @@ class EngineHost:
                 seed=self.seed,
                 initial_wind=_parse_wind(map_config.get("wind")),
             )
-            ignite_ids = list(map_config.get("ignite", []) or [])
-            _ignite_initial(self.engine, map_config)
+            ignite_ids = _ignite_initial(self.engine, map_config)
             if self.metrics_tracker:
                 for sid in ignite_ids:
                     self.metrics_tracker.on_ignition(int(sid), tick=0)
+
+            # Konfigurację lasu wysyłamy do FFSup (support rozpozna ją po polach
+            # location + forestId i ustawi geometrię + bazy agentów). Republikujemy
+            # ją przez kilka pierwszych ticków, bo konsument supportu mógł jeszcze
+            # nie być gotowy w chwili startu.
+            if map_config.get("location") and (
+                map_config.get("forestId") is not None or map_config.get("forestName")
+            ):
+                self._support_config = map_config
+                self._support_config_republish = 5
+            else:
+                self._support_config = None
+                self._support_config_republish = 0
 
             self._stop.clear()
             self._thread = threading.Thread(
@@ -103,6 +126,12 @@ class EngineHost:
         while not self._stop.is_set():
             try:
                 with self._lock:
+                    if self._support_config_republish > 0 and self._support_config:
+                        self.engine.rabbitmq_publisher.publish(
+                            routing_key="support.data.aggregated",
+                            message=self._support_config,
+                        )
+                        self._support_config_republish -= 1
                     self.engine.step()
                     self._log_current_tick()
             except Exception as exc:
@@ -178,6 +207,18 @@ def _sector_type(value: Any) -> SectorType:
         return SectorType.UNTRACKED
 
 
+def _sector_centroid(entry: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
+    """Zwraca (lon, lat) sektora: jawne longitude/latitude albo środek z contours."""
+    if entry.get("longitude") is not None and entry.get("latitude") is not None:
+        return float(entry["longitude"]), float(entry["latitude"])
+    contours = entry.get("contours") or []
+    if contours:
+        lon = sum(p[0] for p in contours) / len(contours)
+        lat = sum(p[1] for p in contours) / len(contours)
+        return lon, lat
+    return None, None
+
+
 def _build_forest_map(cfg: Dict[str, Any]) -> Dict[int, Sector]:
     """
     Build {sector_id: Sector}. Supports two layouts:
@@ -191,18 +232,28 @@ def _build_forest_map(cfg: Dict[str, Any]) -> Dict[int, Sector]:
         for entry in sectors_cfg:
             initial = entry.get("initialState", {}) or {}
             sid = int(entry["sectorId"])
-            forest[sid] = Sector(
+            # config z frontendu trzyma fireLevel w skali 0-100, silnik w 0-1
+            raw_fire = float(initial.get("fireLevel", 0.0))
+            fire_level = raw_fire / 100.0 if raw_fire > 1.0 else raw_fire
+            # config trzyma geometrię jako contours; środek sektora potrzebny
+            # by dopasować rozkaz (location) do sektora w agent managerze
+            lon, lat = _sector_centroid(entry)
+            sector = Sector(
                 sector_id=sid,
                 row=int(entry["row"]),
                 column=int(entry["column"]),
                 sector_type=_sector_type(entry.get("sectorType", "MIXED")),
                 moisture=float(initial.get("plantLitterMoisture", 0.3)),
                 fuel=float(entry.get("fuel", 1.0)),
-                fire_level=float(initial.get("fireLevel", 0.0)),
+                fire_level=fire_level,
                 temperature=float(initial.get("temperature", 20.0)),
-                longitude=entry.get("longitude"),
-                latitude=entry.get("latitude"),
+                longitude=lon,
+                latitude=lat,
             )
+            # sektor z ogniem w configu od razu płonie, inaczej silnik go pominie
+            if fire_level > 0.0:
+                sector.state = SectorState.BURNING
+            forest[sid] = sector
         return forest
 
     rows = int(cfg.get("rows", 10))
@@ -246,34 +297,48 @@ def _build_agent_manager(cfg: Dict[str, Any]) -> AgentManager:
 def _build_sensor_array(cfg: Dict[str, Any], rng: RngManager) -> SensorArray:
     """
     Build sensor array from map config (spec 5.2.2).
-    
-    Supports per-sector sensor configuration via mapConfig.sensors:
-    {
-        "sensors": {
-            "WIND_SPEED": [sector_id1, sector_id2, ...],
-            "TEMP_HUMIDITY": [sector_id3, ...],
-            ...
-        }
-    }
+
+    Obsługuje dwa formaty pola "sensors":
+      - lista obiektów z frontendu/konfiguratora:
+        [{"sensorId": 0, "sensorType": "CO2", "location": {...}}, ...]
+      - słownik typ -> [sector_id, ...] (format wewnętrzny):
+        {"WIND_SPEED": [1, 2], "TEMP_HUMIDITY": [3]}
     """
     sensor_array = SensorArray(rng=rng)
-    sensors_config = cfg.get("sensors", {}) or {}
-    
-    # Build per-sector sensor configuration
-    sector_sensors = {}  # sector_id -> list of SensorType
+    sensors_config = cfg.get("sensors") or []
+
+    if isinstance(sensors_config, list):
+        for entry in sensors_config:
+            type_str = entry.get("sensorType")
+            try:
+                sensor_type = SensorType[type_str]
+            except KeyError:
+                logger.warning("Unknown sensor type: %s, skipping", type_str)
+                continue
+            loc = entry.get("location", {}) or {}
+            sensor_id = int(entry.get("sensorId", len(sensor_array.sensors)))
+            sensor_array.add_sensor(
+                sector_id=sensor_id,
+                sensor_id=sensor_id,
+                sensor_types=[sensor_type],
+                location={
+                    "lon": float(loc.get("longitude", loc.get("lon", 0.0))),
+                    "lat": float(loc.get("latitude", loc.get("lat", 0.0))),
+                },
+            )
+        return sensor_array
+
+    # format słownikowy: typ -> lista sektorów
+    sector_sensors: Dict[int, List[SensorType]] = {}
     for sensor_type_str, sector_ids in sensors_config.items():
         try:
             sensor_type = SensorType[sensor_type_str]
         except KeyError:
-            logger.warning(f"Unknown sensor type: {sensor_type_str}, skipping")
+            logger.warning("Unknown sensor type: %s, skipping", sensor_type_str)
             continue
-        
         for sector_id in (sector_ids or []):
-            if sector_id not in sector_sensors:
-                sector_sensors[sector_id] = []
-            sector_sensors[sector_id].append(sensor_type)
-    
-    # Register sensors with SensorArray
+            sector_sensors.setdefault(sector_id, []).append(sensor_type)
+
     for sector_id, sensor_types in sector_sensors.items():
         sensor_array.add_sensor(
             sector_id=sector_id,
@@ -281,7 +346,6 @@ def _build_sensor_array(cfg: Dict[str, Any], rng: RngManager) -> SensorArray:
             sensor_types=sensor_types,
             location={"lon": 0.0, "lat": 0.0},
         )
-    
     return sensor_array
 
 
@@ -294,9 +358,22 @@ def _parse_wind(wind_cfg: Optional[Dict[str, Any]]) -> Optional[Wind]:
     )
 
 
-def _ignite_initial(engine: SimulationEngine, cfg: Dict[str, Any]) -> None:
-    for sid in cfg.get("ignite", []) or []:
-        engine.ignite_sector(int(sid))
+def _ignite_initial(engine: SimulationEngine, cfg: Dict[str, Any]) -> List[int]:
+    """
+    Podpala sektory startowe i zwraca ich listę.
+
+    Gdy config zawiera jawną listę "ignite", używamy jej. W przeciwnym razie
+    (np. config z frontendu, gdzie wszystkie sektory mają fireLevel 0) silnik
+    sam losuje sektor startowy — zgodnie ze specyfikacją.
+    """
+    explicit = [int(sid) for sid in (cfg.get("ignite") or [])]
+    if explicit:
+        for sid in explicit:
+            engine.ignite_sector(sid)
+        return explicit
+
+    chosen = engine.ignite_random_sector()
+    return [chosen] if chosen is not None else []
 
 
 # ─── REST endpoints (spec section 5.1) ───────────────────────────────────────

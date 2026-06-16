@@ -59,7 +59,10 @@ class AgentEventType(Enum):
 class AgentConfig:
     """Parametry konfiguracyjne modelu agentów."""
     travel_time: int   = 5     # [ticki] stały czas dojazdu do sektora
-    extinguish_rate: float = 0.05  # przyrost extinguishLevel na brygadę na krok
+    # 0.10 daje jednej brygadzie ~10 ticków na ugaszenie — mieści się w czasie
+    # wypalania sektora (~23 ticki), więc pojedyncza reakcja ma sens. Przy 0.05
+    # brygada zawsze przegrywała z wypalaniem (20 ticków > 18).
+    extinguish_rate: float = 0.10  # przyrost extinguishLevel na brygadę na krok
 
 
 # ─── Lokalizacja ──────────────────────────────────────────────────────────────
@@ -89,7 +92,11 @@ class Location:
 
     @staticmethod
     def from_dict(d: Dict[str, float]) -> "Location":
-        return Location(lon=d["lon"], lat=d["lat"])
+        # rozkazy z backendu/frontendu używają longitude/latitude,
+        # telemetria wewnętrzna lon/lat — akceptujemy oba
+        lon = d.get("lon", d.get("longitude"))
+        lat = d.get("lat", d.get("latitude"))
+        return Location(lon=float(lon), lat=float(lat))
 
 
 # ─── Zdarzenia agentów ────────────────────────────────────────────────────────
@@ -528,6 +535,17 @@ class AgentManager:
                     f"Sektor {target_sector_id} płonie — leśnik nie może tam być wysłany"
                 )
 
+            # Powtórzony rozkaz na ten sam sektor nie resetuje dojazdu
+            # (auto-apply wysyła go co tick). Po dojechaniu target_sector_id
+            # jest czyszczony, więc dla patrolującego porównujemy current.
+            if forester.current_action == AgentAction.PATROL and (
+                (forester.state == AgentState.TRAVELLING and
+                 forester.target_sector_id == target_sector_id) or
+                (forester.state == AgentState.PATROLLING and
+                 forester.current_sector_id == target_sector_id)
+            ):
+                return OrderResult.ok()
+
             # Natychmiastowe przejście do TRAVELLING
             forester.state = AgentState.TRAVELLING
             forester.current_action = AgentAction.PATROL
@@ -607,6 +625,24 @@ class AgentManager:
                     "SECTOR_NOT_ON_FIRE",
                     f"Sektor {target_sector_id} nie płonie"
                 )
+
+            # Commitment brygady: jeśli już jedzie/gasi jakiś PŁONĄCY sektor,
+            # ignorujemy przekierowanie. Support co tick poleca inny sektor
+            # (front pożaru się przesuwa), więc bez tego brygada restartowałaby
+            # dojazd co krok i nigdy by nie dojechała. Przyjmujemy nowy rozkaz
+            # tylko gdy brygada jest wolna albo jej obecny cel już nie płonie.
+            active_target = None
+            if brigade.state == AgentState.TRAVELLING:
+                active_target = brigade.target_sector_id
+            elif brigade.state == AgentState.EXTINGUISHING:
+                active_target = brigade.current_sector_id
+
+            if (active_target is not None
+                    and brigade.current_action == AgentAction.EXTINGUISH):
+                active_sector = sectors.get(active_target)
+                if active_sector is not None and active_sector.state.value == "BURNING":
+                    # nadal zajęta sensownym celem — nie przerywamy
+                    return OrderResult.ok()
 
             brigade.state = AgentState.TRAVELLING
             brigade.current_action = AgentAction.EXTINGUISH

@@ -23,6 +23,7 @@ from src.engine.models.sector import Sector, SectorState, SectorType
 from src.engine.models.fire_propagation import Wind, FirePropagationConfig
 from src.engine.rng_manager import RngManager
 from src.engine.agent_manager import AgentManager, Location
+from src.engine.sensors import SensorType
 from src.experiment_logger import ExperimentLogger, SimulationMetricsTracker
 
 
@@ -303,3 +304,89 @@ def test_S9_experiment_logger_output():
 
     finally:
         os.unlink(log_path)
+
+
+# ─── Scenariusz 10: sensory reagują na ogień ─────────────────────────────────
+
+class _RecordingPublisher:
+    """Łapie feed supportu zamiast wysyłać do brokera (broker w testach pada)."""
+
+    def __init__(self):
+        self.available = True
+        self.support_msgs = []
+
+    def publish(self, routing_key, message):
+        if routing_key == "support.data.aggregated":
+            self.support_msgs.append(message)
+        return True
+
+    def __getattr__(self, _):
+        # pozostałe publish_* są no-opami
+        return lambda *a, **k: True
+
+
+def test_S10_sensors_react_to_fire():
+    """Odczyty CO2/PM2.5/temperatury rosną na płonącym sektorze."""
+    engine = make_engine(rows=3, cols=3, seed=11)
+    engine.sensor_array.add_sensor(
+        sector_id=5, sensor_id=0,
+        sensor_types=[SensorType.CO2, SensorType.PM2_5, SensorType.TEMP_HUMIDITY],
+        location={"lon": 1.0, "lat": 1.0},
+    )
+
+    def read_sector5():
+        fl = engine.current_snapshot.sectors[5].fire_level
+        readings = engine.sensor_array.read_all(timestamp="t", sector_fire_levels={5: fl})
+        return {r.sensor_type: r.data for r in readings}
+
+    before = read_sector5()
+    engine.ignite_sector(5)
+    run_ticks(engine, 6)
+    after = read_sector5()
+
+    assert after[SensorType.CO2]["concentration"] > before[SensorType.CO2]["concentration"] + 300
+    assert after[SensorType.PM2_5]["concentration"] > before[SensorType.PM2_5]["concentration"] + 50
+    assert after[SensorType.TEMP_HUMIDITY]["temperature"] > before[SensorType.TEMP_HUMIDITY]["temperature"] + 10
+
+
+# ─── Scenariusz 11: bramkowanie feedu supportu wykrywaniem ───────────────────
+
+def test_S11_support_detection_gating():
+    """Support widzi ogień dopiero po wykryciu sektora przez sensor."""
+    engine = make_engine(rows=3, cols=3, seed=12)
+    # sensor tylko na sektorze 1, sektor 9 zostaje bez pokrycia
+    engine.sensor_array.add_sensor(
+        sector_id=1, sensor_id=0, sensor_types=[SensorType.CO2],
+        location={"lon": 0.0, "lat": 0.0},
+    )
+    pub = _RecordingPublisher()
+    engine.rabbitmq_publisher = pub
+
+    engine.ignite_sector(1)  # ma sensor
+    engine.ignite_sector(9)  # bez sensora i patrolu
+    run_ticks(engine, 6)
+
+    last = {s["sectorId"]: s["state"] for s in pub.support_msgs[-1]["sectors"]}
+
+    # sektor 1 wykryty -> support widzi realny ogień
+    assert 1 in engine._detected_sectors
+    assert last[1]["fireLevel"] > 0
+
+    # sektor 9 niewykryty, ale faktycznie płonie -> support dostaje zero
+    assert 9 not in engine._detected_sectors
+    assert engine.current_snapshot.sectors[9].state == SectorState.BURNING
+    assert last[9]["fireLevel"] == 0.0
+
+
+def test_S11b_detection_disabled_gives_full_state():
+    """Z detection_enabled=False support znów ma pełną wiedzę (stare zachowanie)."""
+    engine = make_engine(rows=3, cols=3, seed=12)
+    engine.detection_enabled = False
+    pub = _RecordingPublisher()
+    engine.rabbitmq_publisher = pub
+
+    engine.ignite_sector(9)  # bez sensora ani patrolu
+    run_ticks(engine, 6)
+
+    last = {s["sectorId"]: s["state"] for s in pub.support_msgs[-1]["sectors"]}
+    assert last[9]["fireLevel"] > 0, "bez bramkowania support powinien widzieć ogień"
