@@ -390,3 +390,89 @@ def test_S11b_detection_disabled_gives_full_state():
 
     last = {s["sectorId"]: s["state"] for s in pub.support_msgs[-1]["sectors"]}
     assert last[9]["fireLevel"] > 0, "bez bramkowania support powinien widzieć ogień"
+
+
+# ─── Scenariusz 12: nazwy fireState zgodne z enumem backendu ──────────────────
+
+def test_S12_fire_state_names_match_backend_enum():
+    """get_fire_state_name zwraca wartości, które potrafi sparsować backend."""
+    allowed = {"NON_COMBUSTED", "MILD", "MODERATE", "FULL", "SEVERE",
+               "COMBUSTED", "EXTINGUISHED"}
+    forest = build_grid(1, 1)
+    sector = forest[1]
+
+    sector.state = SectorState.DORMANT
+    sector.fire_level = 0.0
+    assert sector.get_fire_state_name() == "NON_COMBUSTED"
+
+    sector.state = SectorState.BURNING
+    for level, expected in [(0.1, "MILD"), (0.4, "MODERATE"),
+                            (0.6, "FULL"), (0.9, "SEVERE")]:
+        sector.fire_level = level
+        assert sector.get_fire_state_name() == expected, f"fireLevel={level}"
+
+    sector.state = SectorState.EXTINGUISHED
+    assert sector.get_fire_state_name() == "EXTINGUISHED"
+    sector.state = SectorState.ASH
+    assert sector.get_fire_state_name() == "COMBUSTED"
+
+    # wszystkie zwracane wartości mieszczą się w enumie backendu
+    assert {sector.get_fire_state_name()} <= allowed
+
+
+# ─── Scenariusz 13: threatLevel w telemetrii ─────────────────────────────────
+
+def test_S13_threat_level_in_telemetry():
+    """Telemetria niesie threatLevel z poprawnego zbioru, rosnący przy pożarze."""
+    allowed = {"LOW", "MEDIUM", "HIGH", "VERY_HIGH", "CRITICAL"}
+    engine = make_engine(rows=3, cols=3, seed=20)
+    pub = _RecordingPublisher()
+    engine.rabbitmq_publisher = pub
+    engine.ignite_sector(5)  # środek siatki 3x3
+    run_ticks(engine, 8)
+
+    # threatLevel jest na kanale mapy (telemetry["sectors"]), nie w feedzie supportu
+    telemetry = engine._phase_telemetry_generation(
+        next_sectors=engine.current_snapshot.sectors,
+        previous_sectors=engine.current_snapshot.sectors,
+        wind=engine.current_snapshot.wind,
+        temperature=engine.current_snapshot.global_temperature,
+        timestamp="t",
+    )
+    by_id = {s["sectorId"]: s for s in telemetry["sectors"]}
+    assert all(s["threatLevel"] in allowed for s in telemetry["sectors"])
+    # płonący środek ma wysoki poziom zagrożenia
+    assert by_id[5]["threatLevel"] in {"HIGH", "VERY_HIGH", "CRITICAL"}
+
+
+# ─── Scenariusz 14: cofanie kroku przywraca stan ─────────────────────────────
+
+def test_S14_step_back_restores_state():
+    """step_back wraca do poprzedniego stanu sektorów i pozwala iść dalej."""
+    engine = make_engine(rows=3, cols=3, seed=30)
+    engine.ignite_sector(5)
+    run_ticks(engine, 4)
+
+    tick4 = engine.tick_count
+    snap4 = {sid: s.fire_level for sid, s in engine.current_snapshot.sectors.items()}
+
+    engine.step()
+    engine.step()
+    assert engine.tick_count == tick4 + 2
+
+    assert engine.step_back()
+    assert engine.step_back()
+    assert engine.tick_count == tick4
+
+    snap_back = {sid: s.fire_level for sid, s in engine.current_snapshot.sectors.items()}
+    assert snap_back == snap4, "po cofnięciu stan sektorów powinien wrócić do tick4"
+
+    # po cofnięciu da się znów iść w przód
+    engine.step()
+    assert engine.tick_count == tick4 + 1
+
+    # nie można cofnąć poniżej stanu początkowego w nieskończoność
+    for _ in range(50):
+        if not engine.step_back():
+            break
+    assert engine.step_back() is False

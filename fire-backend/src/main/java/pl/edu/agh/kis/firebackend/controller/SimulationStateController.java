@@ -321,4 +321,50 @@ public class SimulationStateController
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("Simulation service unreachable");
         }
     }
+
+    // Sterowanie przebiegiem: pauza, wznowienie oraz krok ręczny w przód i wstecz.
+    // Wszystkie proxują do symulatora, który trzyma stan i historię cofania.
+
+    @PostMapping("/pause")
+    public ResponseEntity<String> pauseSimulation() {
+        return forwardSimple("/pause", "Simulation paused");
+    }
+
+    @PostMapping("/resume")
+    public ResponseEntity<String> resumeSimulation() {
+        return forwardSimple("/resume", "Simulation resumed");
+    }
+
+    @PostMapping("/step")
+    public ResponseEntity<String> stepForward(@RequestParam(value = "ticks", defaultValue = "1") int ticks) {
+        return forwardStep("/step", ticks, "Stepped forward");
+    }
+
+    @PostMapping("/step-back")
+    public ResponseEntity<String> stepBack(@RequestParam(value = "ticks", defaultValue = "1") int ticks) {
+        return forwardStep("/step_back", ticks, "Stepped back");
+    }
+
+    private ResponseEntity<String> forwardSimple(String simEndpoint, String okMessage) {
+        String url = String.format("http://%s:%d%s", simulationHost, simulatorPort, simEndpoint);
+        try {
+            httpRequestService.sendPostRequest(url, "");
+            return ResponseEntity.ok(okMessage);
+        } catch (Exception e) {
+            log.error("Failed to send {} request to simulation at {}:{}", simEndpoint, simulationHost, simulatorPort, e);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("Simulation service unreachable");
+        }
+    }
+
+    private ResponseEntity<String> forwardStep(String simEndpoint, int ticks, String okMessage) {
+        String url = String.format("http://%s:%d%s", simulationHost, simulatorPort, simEndpoint);
+        try {
+            java.util.Map<String, Object> payload = java.util.Map.of("ticks", Math.max(1, ticks));
+            httpRequestService.sendPostRequest(url, payload);
+            return ResponseEntity.ok(okMessage);
+        } catch (Exception e) {
+            log.error("Failed to send {} request to simulation at {}:{}", simEndpoint, simulationHost, simulatorPort, e);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("Simulation service unreachable");
+        }
+    }
 }

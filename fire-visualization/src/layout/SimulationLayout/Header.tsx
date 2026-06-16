@@ -10,6 +10,7 @@ import { StopSimulationButton } from '../../components/simulation/StopSimulation
 import AutoRecommendationSwitch from '../../components/simulation/AutoRecommendationSwitch';
 import LlmModeSwitch from '../../components/simulation/LlmModeSwitch';
 import DownloadConfigurationButton from '../../components/simulation/DownloadConfigurationButton';
+import { SimulationPlaybackControls } from '../../components/simulation/SimulationPlaybackControls';
 
 import { AppBarStyled } from '../AppBarStyled';
 
@@ -33,6 +34,7 @@ export const Header = () => {
       >
         <AutoRecommendationSwitch />
         <LlmModeSwitch />
+        <SimulationPlaybackControls />
         <DownloadConfigurationButton />
         <StopSimulationButton />
       </Box>

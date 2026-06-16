@@ -15,8 +15,8 @@ public class SectorState
     public double plantLitterMoisture;
     public double co2Concentration;
     public double pm2_5Concentration;
-    ThreatLevel threatLevel;
-    FireState fireState;
+    public ThreatLevel threatLevel;
+    public FireState fireState;
 
     // For debugging purposes
     public double fireLevel;

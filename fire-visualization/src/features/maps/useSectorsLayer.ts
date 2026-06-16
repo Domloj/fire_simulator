@@ -33,7 +33,7 @@ export const useSectorsLayer = ({ sectors }: Configuration, disableOnHover?: boo
   // OPTIMIZATION: Create update triggers for Deck.gl to avoid unnecessary re-renders
   // Only re-render when actual sector data (fireLevel, burnLevel, extinguishLevel) changes
   const sectorColorTriggers = useMemo(() => {
-    return sectors.map(s => [s.sectorId, s.fireLevel, s.burnLevel, s.extinguishLevel]);
+    return sectors.map(s => [s.sectorId, s.fireLevel, s.burnLevel, s.extinguishLevel, s.threatLevel]);
   }, [sectors]);
 
   return useMemo(() => {
@@ -49,6 +49,7 @@ export const useSectorsLayer = ({ sectors }: Configuration, disableOnHover?: boo
       updateTriggers: {
         getFillColor: sectorColorTriggers,
         getLineColor: sectorColorTriggers,
+        getLineWidth: sectorColorTriggers,
       },
       getFillColor: (sector) => {
         const isLost = sector.burnLevel !== null && sector.burnLevel > LOST_BURN_LEVEL_THRESHOLD;
@@ -78,6 +79,9 @@ export const useSectorsLayer = ({ sectors }: Configuration, disableOnHover?: boo
           return [150, 0, 0, 210];                      // 4 EXTREME — ciemnoczerwony
         }
 
+        // Zagrożenie sektorów bez ognia pokazujemy obwódką (getLineColor),
+        // nie wypełnieniem, żeby nie myliło się z aktywnym pożarem.
+
         // Fallback or additional indicators (like temperature or PM2.5)
         let intensityLevel = 0;
         const temp = sector.initialState.temperature;
@@ -99,18 +103,46 @@ export const useSectorsLayer = ({ sectors }: Configuration, disableOnHover?: boo
         // Scale opacity based on sector count - more sectors = less visible borders
         const sectorCount = sectors?.length || 1;
         const opacity = sectorCount > 100 ? 80 : sectorCount > 50 ? 120 : sectorCount > 25 ? 150 : 200;
-        // Lost sectors use a standardized dark grey border (grey[600] from theme); others keep the existing red outline with reduced opacity
-        return isLost ? [89, 89, 89, Math.min(255, opacity + 55)] : [255, 60, 0, opacity];
+
+        // Sektor spalony: standardowa szara ramka.
+        if (isLost) return [89, 89, 89, Math.min(255, opacity + 55)];
+
+        // Sektor płonący: ciepła ramka, wypełnienie i tak pokazuje ogień.
+        if (sector.fireLevel !== null && sector.fireLevel > 0) {
+          return [255, 60, 0, opacity];
+        }
+
+        // Sektor bez ognia: poziom zagrożenia kodujemy obwódką w palecie
+        // lawenda -> fiolet -> magenta -> róż. To inna rodzina barw niż pożar,
+        // a poziomy wyraźnie różnią się odcieniem, nie tylko jasnością.
+        switch (sector.threatLevel) {
+          case 'MEDIUM':    return [180, 160, 255, 200];  // jasny lawendowy
+          case 'HIGH':      return [165, 85, 240, 230];   // fiolet
+          case 'VERY_HIGH': return [220, 50, 220, 245];   // magenta
+          case 'CRITICAL':  return [255, 20, 130, 255];   // różowo-magenta
+        }
+        // LOW albo brak danych: ledwo widoczna neutralna ramka
+        return [120, 120, 130, Math.max(20, opacity - 120)];
       },
-      getLineWidth: () => {
+      getLineWidth: (sector) => {
         const sectorCount = sectors?.length || 1;
-        // Scale line width based on sector count - more sectors = thinner borders
-        if (sectorCount === 1) return 1;
-        if (sectorCount > 100) return 1;
-        if (sectorCount > 50) return 2;
-        if (sectorCount > 25) return 3;
-        return 4;
+        // Bazowa grubość zależna od liczby sektorów (gęściej = cieniej).
+        const base = sectorCount > 100 ? 1 : sectorCount > 50 ? 1.5 : sectorCount > 25 ? 2 : 3;
+
+        // Sektor bez ognia: im wyższe zagrożenie, tym grubsza fioletowa ramka.
+        if (sector.fireLevel === null || sector.fireLevel === 0) {
+          switch (sector.threatLevel) {
+            case 'MEDIUM':    return Math.max(base, 2);
+            case 'HIGH':      return Math.max(base, 3);
+            case 'VERY_HIGH': return Math.max(base, 4);
+            case 'CRITICAL':  return Math.max(base, 5);
+          }
+        }
+        return base;
       },
+      // Grubość w pikselach, żeby fioletowe ramki zagrożenia były czytelne
+      // niezależnie od poziomu przybliżenia.
+      lineWidthUnits: 'pixels',
       lineWidthMinPixels: 1,
       highlightColor: [255, 80, 0, 80], // Reduced opacity from 220 to 80 for subtler hover effect
       autoHighlight: !disableOnHover,

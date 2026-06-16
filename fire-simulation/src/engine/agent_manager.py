@@ -582,7 +582,7 @@ class AgentManager:
         Oczekiwany format:
             { "fireBrigadeId": 1,
               "action": "EXTINGUISH" | "GO_TO_BASE",
-              "fireState": "MEDIUM_FIRE",
+              "fireState": "MODERATE",
               "location": { "lon": ..., "lat": ... },
               "timestamp": "..." }
         """

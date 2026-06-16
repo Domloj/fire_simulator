@@ -14,6 +14,8 @@ export interface Sector {
   fireLevel: number | null;       // level of fire in this sector
   burnLevel: number | null;       // level of burn in this sector
   extinguishLevel: number | null; // level of extinguishment of the fire in this sector
+  fireState?: string | null;      // FireState z silnika (NON_COMBUSTED..SEVERE/COMBUSTED)
+  threatLevel?: string | null;    // poziom zagrożenia (LOW..CRITICAL), monitoring leśników
   assignedBrigades?: number[];    // IDs of fire brigades assigned to this sector
 }
 
@@ -37,6 +39,8 @@ type SectorStateUpdate = {
   fireLevel: number | null;
   burnLevel: number | null;
   extinguishLevel: number | null;
+  fireState?: string | null;
+  threatLevel?: string | null;
 }
 
 interface SectorState {
@@ -81,6 +85,8 @@ export const Sector = {
       fireLevel: state.fireLevel ?? sector.fireLevel,
       burnLevel: state.burnLevel ?? sector.burnLevel,
       extinguishLevel: state.extinguishLevel ?? sector.extinguishLevel,
+      fireState: state.fireState ?? sector.fireState,
+      threatLevel: state.threatLevel ?? sector.threatLevel,
       assignedBrigades: assignedBrigades ?? sector.assignedBrigades,
     };
   },

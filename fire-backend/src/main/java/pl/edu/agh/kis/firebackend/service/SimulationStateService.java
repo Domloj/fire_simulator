@@ -40,6 +40,8 @@ import pl.edu.agh.kis.firebackend.service.model.simulation.Sector;
 import pl.edu.agh.kis.firebackend.service.model.simulation.SimulationState;
 import pl.edu.agh.kis.firebackend.service.model.simulation.SimulationStateDto;
 import pl.edu.agh.kis.firebackend.service.model.SectorState;
+import pl.edu.agh.kis.firebackend.service.model.FireState;
+import pl.edu.agh.kis.firebackend.service.model.ThreatLevel;
 import pl.edu.agh.kis.firebackend.util.SectorIdResolver;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -559,7 +561,8 @@ public class SimulationStateService {
                             SectorState state = new SectorState(
                                     new java.util.Date(),
                                     0.0, 0.0, null, 0.0, 0.0, 0.0, 0.0,
-                                    null, null,
+                                    parseThreatLevel(sectorState.threatLevel()),
+                                    parseFireState(sectorState.fireState()),
                                     sectorState.fireLevel(),
                                     sectorState.burnLevel(),
                                     sectorState.extinguishLevel());
@@ -572,6 +575,8 @@ public class SimulationStateService {
                             sector.state.fireLevel = sectorState.fireLevel();
                             sector.state.burnLevel = sectorState.burnLevel();
                             sector.state.extinguishLevel = sectorState.extinguishLevel();
+                            sector.state.fireState = parseFireState(sectorState.fireState());
+                            sector.state.threatLevel = parseThreatLevel(sectorState.threatLevel());
                         }
                     }
                 });
@@ -585,7 +590,8 @@ public class SimulationStateService {
                             SectorState state = new SectorState(
                                     new java.util.Date(),
                                     0.0, 0.0, null, 0.0, 0.0, 0.0, 0.0,
-                                    null, null,
+                                    parseThreatLevel(sectorState.threatLevel()),
+                                    parseFireState(sectorState.fireState()),
                                     sectorState.fireLevel(),
                                     sectorState.burnLevel(),
                                     sectorState.extinguishLevel());
@@ -596,6 +602,8 @@ public class SimulationStateService {
                             sector.state.fireLevel = sectorState.fireLevel();
                             sector.state.burnLevel = sectorState.burnLevel();
                             sector.state.extinguishLevel = sectorState.extinguishLevel();
+                            sector.state.fireState = parseFireState(sectorState.fireState());
+                            sector.state.threatLevel = parseThreatLevel(sectorState.threatLevel());
                         }
                     }
 
@@ -1014,6 +1022,27 @@ public class SimulationStateService {
         return cloned;
     }
 
+    // Telemetria niesie fireState/threatLevel jako string. Nieznana albo pusta
+    // wartość daje null zamiast wyjątku, dzięki czemu reszta aktualizacji sektora
+    // przechodzi normalnie.
+    private static FireState parseFireState(String value) {
+        if (value == null) return null;
+        try {
+            return FireState.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static ThreatLevel parseThreatLevel(String value) {
+        if (value == null) return null;
+        try {
+            return ThreatLevel.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private SectorState cloneSectorState(SectorState state) {
         // Create new SectorState with all visible fields
         SectorState cloned = new SectorState(
@@ -1025,8 +1054,8 @@ public class SimulationStateService {
                 state.plantLitterMoisture,
                 state.co2Concentration,
                 state.pm2_5Concentration,
-                null, // threatLevel - not accessible
-                null, // fireState - not accessible
+                state.threatLevel,
+                state.fireState,
                 state.fireLevel,
                 state.burnLevel,
                 state.extinguishLevel);

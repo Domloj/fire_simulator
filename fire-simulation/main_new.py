@@ -36,6 +36,7 @@ class EngineHost:
         self.agent_manager: Optional[AgentManager] = None
         self._lock = threading.Lock()
         self._stop = threading.Event()
+        self._paused = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self.tick_interval: float = 1.0
         self.seed: Optional[int] = None
@@ -116,14 +117,29 @@ class EngineHost:
                 self._support_config_republish = 0
 
             self._stop.clear()
+            self._paused.clear()
             self._thread = threading.Thread(
                 target=self._run_loop, daemon=True, name="SimLoop"
             )
             self._thread.start()
             return {"seed": rng.seed, "simulation_id": self.engine.simulation_id}
 
+    def is_paused(self) -> bool:
+        return self._paused.is_set()
+
+    def pause(self) -> None:
+        self._paused.set()
+
+    def resume(self) -> None:
+        self._paused.clear()
+
     def _run_loop(self) -> None:
         while not self._stop.is_set():
+            # W pauzie pętla nie wykonuje kroków, ale żyje, żeby dało się
+            # wznowić albo robić kroki ręcznie.
+            if self._paused.is_set():
+                time.sleep(0.05)
+                continue
             try:
                 with self._lock:
                     if self._support_config_republish > 0 and self._support_config:
@@ -153,6 +169,7 @@ class EngineHost:
 
     def stop(self) -> None:
         self._stop.set()
+        self._paused.clear()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         self._thread = None
@@ -178,13 +195,33 @@ class EngineHost:
             self.metrics_tracker.on_brigade_dispatched(brigade_id, tick)
 
     def manual_step(self, ticks: int = 1) -> Dict[str, Any]:
-        if self.is_running():
-            raise RuntimeError("Cannot manual-step while loop is running")
+        # Krok ręczny dozwolony gdy pętla nie biegnie albo jest zapauzowana.
+        if self.is_running() and not self._paused.is_set():
+            raise RuntimeError("Zapauzuj symulację przed ręcznym krokowaniem")
         with self._lock:
+            if self.engine is None:
+                raise RuntimeError("Simulation not initialised")
             for _ in range(ticks):
                 self.engine.step()
                 self._log_current_tick()
             return self.engine.get_snapshot().to_dict()
+
+    def step_back(self, ticks: int = 1) -> Dict[str, Any]:
+        # Cofanie dozwolone na tych samych zasadach co krok w przód.
+        if self.is_running() and not self._paused.is_set():
+            raise RuntimeError("Zapauzuj symulację przed cofaniem kroku")
+        with self._lock:
+            if self.engine is None:
+                raise RuntimeError("Simulation not initialised")
+            moved = 0
+            for _ in range(ticks):
+                if not self.engine.step_back():
+                    break
+                moved += 1
+            # Po cofnięciu publikujemy przywrócony stan, żeby mapa się odświeżyła.
+            self.engine.publish_current_state()
+            snap = self.engine.get_snapshot().to_dict()
+            return {"tick": snap["tick"], "steppedBack": moved}
 
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
@@ -397,6 +434,18 @@ def stop_simulation():
     return jsonify({"status": "ok"})
 
 
+@app.route("/pause", methods=["POST"])
+def pause():
+    host.pause()
+    return jsonify({"status": "ok", "paused": True})
+
+
+@app.route("/resume", methods=["POST"])
+def resume():
+    host.resume()
+    return jsonify({"status": "ok", "paused": False})
+
+
 @app.route("/step", methods=["POST"])
 def step():
     data = request.get_json(silent=True) or {}
@@ -404,6 +453,17 @@ def step():
     try:
         snap = host.manual_step(ticks)
         return jsonify({"status": "ok", "tick": snap["tick"]})
+    except RuntimeError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 409
+
+
+@app.route("/step_back", methods=["POST"])
+def step_back():
+    data = request.get_json(silent=True) or {}
+    ticks = int(data.get("ticks", 1))
+    try:
+        result = host.step_back(ticks)
+        return jsonify({"status": "ok", **result})
     except RuntimeError as exc:
         return jsonify({"status": "error", "message": str(exc)}), 409
 
@@ -418,7 +478,11 @@ def snapshot():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "running": host.is_running()})
+    return jsonify({
+        "status": "ok",
+        "running": host.is_running(),
+        "paused": host.is_paused(),
+    })
 
 
 @app.route("/set_speed", methods=["POST"])

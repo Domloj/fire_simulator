@@ -180,6 +180,9 @@ Maps (Sectors) to główna baza danych zawierająca definicje obszarów monitoro
 
 \subsubsection{Stany sektora}
 
+
+
+
 Sektor może znajdować się w jednym z trzech stanów:
 \begin{itemize}
     \item \textbf{INACTIVE} -- brak ognia
@@ -915,6 +918,44 @@ Proces wykrywania oraz modelowania rozprzestrzeniania się pożaru opiera się n
 Każdy sektor monitoruje swój aktualny stan na podstawie danych pochodzących z przypisanych sensorów.
 
 Detekcja zagrożenia polega na obserwowaniu zmian stanu sektorów, w szczególności przejścia sektora ze stanu \texttt{INACTIVE} do stanu \texttt{ACTIVE}.
+
+\subsection{Klasyfikacja stanu pożaru oraz poziom zagrożenia sektora}
+\label{sec:fire-threat-enums}
+
+Stan każdego sektora opisują dwa niezależne pola: \texttt{fireState} (faktyczny stan pożaru) oraz \texttt{threatLevel} (poziom zagrożenia pożarowego, niezależny od tego, czy sektor już się pali). Oba pola wyznacza symulator i przekazuje w telemetrii stanu sektora, a backend mapuje je na poniższe enumeracje.
+
+\subsubsection*{Enumeracja \texttt{FIRE\_STATE}}
+
+Wartość wyznaczana jest z ciągłej intensywności pożaru \texttt{fireLevel} $\in [0,1]$:
+
+\begin{itemize}
+    \item \texttt{NON\_COMBUSTED} -- sektor bez ognia (\texttt{fireLevel} $= 0$),
+    \item \texttt{MILD} -- \texttt{fireLevel} $\in (0,\ 0{,}25]$,
+    \item \texttt{MODERATE} -- \texttt{fireLevel} $\in (0{,}25,\ 0{,}5]$,
+    \item \texttt{FULL} -- \texttt{fireLevel} $\in (0{,}5,\ 0{,}75]$,
+    \item \texttt{SEVERE} -- \texttt{fireLevel} $\in (0{,}75,\ 1{,}0]$,
+    \item \texttt{COMBUSTED} -- sektor wypalony (paliwo wyczerpane),
+    \item \texttt{EXTINGUISHED} -- sektor ugaszony przez brygadę.
+\end{itemize}
+
+Wartość \texttt{NO\_DATA} rezerwowana jest dla sytuacji, w której backend nie otrzymał jeszcze poprawnego stanu sektora.
+
+\subsubsection*{Enumeracja \texttt{THREAT\_LEVEL}}
+
+Poziom zagrożenia przyjmuje wartości \texttt{LOW}, \texttt{MEDIUM}, \texttt{HIGH}, \texttt{VERY\_HIGH} oraz \texttt{CRITICAL} (a także \texttt{NO\_DATA} przy braku danych). Jest to metryka monitoringu leśników, opisująca ryzyko pożarowe sektora.
+
+Dla sektora aktywnie płonącego poziom wynika wprost z klasyfikacji \texttt{fireState}: \texttt{MILD} odpowiada poziomowi \texttt{HIGH}, \texttt{MODERATE} oraz \texttt{FULL} poziomowi \texttt{VERY\_HIGH}, a \texttt{SEVERE} poziomowi \texttt{CRITICAL}. Sektor wypalony lub ugaszony otrzymuje poziom \texttt{LOW}.
+
+Dla sektora bez ognia poziom wyznacza odległość BFS od najbliższego aktywnie płonącego sektora. Symulator oblicza wieloźródłowe BFS startując równocześnie od wszystkich płonących sektorów (zasięg maksymalny 3 sektory):
+
+\begin{itemize}
+    \item odległość 1 -- bazowy poziom \texttt{VERY\_HIGH},
+    \item odległość 2 -- bazowy poziom \texttt{HIGH},
+    \item odległość 3 -- bazowy poziom \texttt{MEDIUM},
+    \item poza zasięgiem (odległość $\geq 4$ lub brak pożaru) -- \texttt{LOW}.
+\end{itemize}
+
+Bazowy poziom jest następnie modyfikowany przez suchość sektora ($\mathit{dryness} = 1 - \mathit{moisture}$): bardzo suchy sektor ($\mathit{dryness} > 0{,}7$) podnosi poziom o jeden stopień, a wilgotny ($\mathit{dryness} < 0{,}3$) obniża o jeden stopień. Wynik jest obcinany do zakresu \texttt{LOW}--\texttt{CRITICAL}. Dzięki temu zagrożenie tworzy czytelny gradient promieniujący wokół frontu pożaru.
 
 \subsection{Moduł reguł monitorowania oraz akcji gaśniczych}
 

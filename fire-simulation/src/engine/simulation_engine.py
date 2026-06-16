@@ -14,6 +14,7 @@ Tick lifecycle (section 4.1):
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
+from collections import deque
 import copy
 import uuid
 import logging
@@ -144,6 +145,11 @@ class SimulationEngine:
         self.detection_enabled = True
         self._detected_sectors: set = set()
 
+        # Historia stanów do cofania kroku (sektory + agenci + RNG). Trzymana
+        # z ograniczeniem, żeby nie rosła w nieskończoność przy długim biegu.
+        self._history: List[Dict[str, Any]] = []
+        self.max_history = 1000
+
         # Current state
         self.current_snapshot: Optional[SimulationSnapshot] = None
         self.last_events: List[AgentEvent] = []
@@ -191,8 +197,9 @@ class SimulationEngine:
             self.rng = RngManager(seed=seed)
             self.fire_propagation.rng = self.rng
 
-        # Świeży przebieg: nic jeszcze nie wykryte
+        # Świeży przebieg: nic jeszcze nie wykryte, pusta historia cofania
         self._detected_sectors = set()
+        self._history = []
 
         # Create initial snapshot
         self.current_snapshot = SimulationSnapshot(
@@ -226,7 +233,17 @@ class SimulationEngine:
         """
         if self.current_snapshot is None:
             raise RuntimeError("Simulation not initialized. Call initialize() first.")
-        
+
+        # Zapis stanu sprzed tego kroku do historii cofania. Agentów kopiujemy
+        # zanim process_tick ich zmodyfikuje, a RNG jest już w snapshocie.
+        self._history.append({
+            "snapshot": self.current_snapshot.clone(),
+            "agent_manager": copy.deepcopy(self.agent_manager),
+            "detected": set(self._detected_sectors),
+        })
+        if len(self._history) > self.max_history:
+            self._history.pop(0)
+
         # Phase 1: Create immutable snapshot of previous state
         previous_snapshot = self.current_snapshot.clone()
         
@@ -277,7 +294,50 @@ class SimulationEngine:
         )
         
         return self.current_snapshot
-    
+
+    def step_back(self) -> bool:
+        """
+        Cofa symulację o jeden krok, przywracając stan z historii (sektory,
+        agenci, RNG i zbiór wykrytych sektorów). Zwraca False gdy nie ma już
+        czego cofać.
+        """
+        if not self._history:
+            return False
+
+        record = self._history.pop()
+        self.current_snapshot = record["snapshot"]
+        self.agent_manager = record["agent_manager"]
+        self._detected_sectors = record["detected"]
+        self.tick_count = self.current_snapshot.tick
+
+        # Przywrócenie RNG, żeby ponowne kroki w przód były spójne ze stanem.
+        try:
+            self.rng.set_state(self.current_snapshot.rng_state)
+            self.fire_propagation.rng = self.rng
+        except Exception:
+            logger.warning("Nie udało się przywrócić stanu RNG przy cofaniu kroku")
+
+        return True
+
+    def publish_current_state(self) -> None:
+        """
+        Generuje i publikuje telemetrię z bieżącego snapshotu, bez wykonywania
+        kroku. Używane po cofnięciu, żeby backend i mapa odświeżyły się do
+        przywróconego stanu.
+        """
+        if self.current_snapshot is None:
+            return
+        timestamp = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+        sectors = self.current_snapshot.sectors
+        telemetry = self._phase_telemetry_generation(
+            next_sectors=sectors,
+            previous_sectors=sectors,
+            wind=self.current_snapshot.wind,
+            temperature=self.current_snapshot.global_temperature,
+            timestamp=timestamp,
+        )
+        self._phase_rabbitmq_publication(telemetry)
+
     def _phase_fire_propagation(self, previous_snapshot: SimulationSnapshot) -> Dict[int, Sector]:
         """
         Phase 2: Fire propagation (section 4.2).
@@ -460,6 +520,11 @@ class SimulationEngine:
             "agents": [],
         }
         
+        # Odległość każdego sektora do najbliższego pożaru (BFS wieloźródłowy z
+        # palących się sektorów). Steruje poziomem zagrożenia, dzięki czemu
+        # ryzyko tworzy gradient wokół ognia zamiast jednolitej plamy.
+        dist_to_fire = self._distances_to_fire(next_sectors)
+
         # Sector state telemetry (spec 5.2.1).
         # Silnik trzyma poziomy w skali 0-1, telemetria FFSup/FFVis oczekuje
         # 0-100 (alpha na mapie, requiredBrigades = ceil(fireLevel/3)).
@@ -470,6 +535,7 @@ class SimulationEngine:
                 "burnLevel": sector.burn_level * 100.0,
                 "extinguishLevel": sector.extinguish_level * 100.0,
                 "fireState": sector.get_fire_state_name(),
+                "threatLevel": sector.get_threat_level(dist_to_fire.get(sector_id)),
             }
             telemetry["sectors"].append(sector_telemetry)
             
@@ -615,6 +681,30 @@ class SimulationEngine:
         # Backend tego nie agreguje (robi to tylko dla frontendu przez SSE),
         # więc źródłem danych dla supportu jest bezpośrednio symulator.
         self._publish_support_feed(telemetry_data)
+
+    def _distances_to_fire(self, sectors: Dict[int, Sector], max_dist: int = 3) -> Dict[int, int]:
+        """
+        Zwraca mapę sector_id -> odległość (w sektorach) do najbliższego
+        płonącego sektora, licząc BFS wieloźródłowy po sąsiedztwie. Sektory
+        dalej niż max_dist są pomijane (brak wpisu = poza zasięgiem).
+        """
+        dist: Dict[int, int] = {}
+        queue = deque()
+        for sid, s in sectors.items():
+            if s.is_burning():
+                dist[sid] = 0
+                queue.append(sid)
+
+        while queue:
+            cur = queue.popleft()
+            if dist[cur] >= max_dist:
+                continue
+            for neighbor_id, _ in self.adjacency_map.get(cur, []):
+                if neighbor_id not in dist:
+                    dist[neighbor_id] = dist[cur] + 1
+                    queue.append(neighbor_id)
+
+        return dist
 
     def _sensor_trips(self, reading: SensorReading) -> bool:
         """Czy odczyt sensora oznacza wykryty pożar (przekroczony próg)."""

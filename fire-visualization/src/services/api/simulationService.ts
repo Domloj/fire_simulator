@@ -64,6 +64,34 @@ export const simulationService = {
   },
 
   /**
+   * Pauza symulacji (zatrzymuje automatyczne tickowanie, sesja żyje).
+   */
+  pauseSimulation: async (): Promise<void> => {
+    await httpClient.post(`${baseUrl}${API_CONFIG.ENDPOINTS.SIMULATION.PAUSE}`, {});
+  },
+
+  /**
+   * Wznowienie automatycznego tickowania.
+   */
+  resumeSimulation: async (): Promise<void> => {
+    await httpClient.post(`${baseUrl}${API_CONFIG.ENDPOINTS.SIMULATION.RESUME}`, {});
+  },
+
+  /**
+   * Krok w przód o zadaną liczbę ticków (działa gdy symulacja jest w pauzie).
+   */
+  stepForward: async (ticks = 1): Promise<void> => {
+    await httpClient.post(`${baseUrl}${API_CONFIG.ENDPOINTS.SIMULATION.STEP}?ticks=${ticks}`, {});
+  },
+
+  /**
+   * Krok wstecz o zadaną liczbę ticków (przywraca stan z historii).
+   */
+  stepBack: async (ticks = 1): Promise<void> => {
+    await httpClient.post(`${baseUrl}${API_CONFIG.ENDPOINTS.SIMULATION.STEP_BACK}?ticks=${ticks}`, {});
+  },
+
+  /**
    * Toggle LLM-driven recommendation mode in support service.
    * When enabled=true, support will run in pure LLM mode (no MCTS).
    */

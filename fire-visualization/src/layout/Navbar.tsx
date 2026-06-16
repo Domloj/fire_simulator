@@ -7,6 +7,7 @@ import { StopSimulationButton } from '../components/simulation/StopSimulationBut
 import AutoRecommendationSwitch from '../components/simulation/AutoRecommendationSwitch';
 import LlmModeSwitch from '../components/simulation/LlmModeSwitch';
 import DownloadConfigurationButton from '../components/simulation/DownloadConfigurationButton';
+import { SimulationPlaybackControls } from '../components/simulation/SimulationPlaybackControls';
 import '../assets/styles/Navbar.css';
 
 export const Navbar = () => {
@@ -38,6 +39,7 @@ export const Navbar = () => {
       <Box className="navbar-actions-simulation">
         <AutoRecommendationSwitch />
         <LlmModeSwitch />
+        <SimulationPlaybackControls />
         <DownloadConfigurationButton />
         <StopSimulationButton />
       </Box>

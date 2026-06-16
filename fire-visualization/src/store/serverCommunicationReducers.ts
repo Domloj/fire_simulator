@@ -121,6 +121,8 @@ const transformSectorData = (sector: any) => ({
     fireLevel:           sector.state?.fireLevel ?? 0,
     burnLevel:           sector.state?.burnLevel ?? 0,
     extinguishLevel:     sector.state?.extinguishLevel ?? 0,
+    fireState:           sector.state?.fireState ?? null,
+    threatLevel:         sector.state?.threatLevel ?? null,
     timestamp:           sector.state?.timestamp  ? Date.parse(sector.state.timestamp as any) : 0,
   },
   contours:         sector.contours || [],
