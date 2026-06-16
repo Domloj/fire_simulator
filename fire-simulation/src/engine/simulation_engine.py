@@ -714,7 +714,7 @@ class SimulationEngine:
         Aktualizuje zbiór wykrytych sektorów (Krok 3).
 
         Sektor zostaje wykryty, gdy płonie i jednocześnie:
-        - któryś sensor na nim przekroczył próg, albo
+        - któryś sensor na nim lub na sektorze sąsiednim przekroczył próg, albo
         - patrol leśny stoi na nim lub na sektorze sąsiednim.
 
         Wykrycie jest zatrzaskowe (latch): raz wykryty sektor pozostaje znany
@@ -735,18 +735,24 @@ class SimulationEngine:
             for neighbor_id, _ in self.adjacency_map.get(sid, []):
                 patrol_observed.add(neighbor_id)
 
-        # sektory, na których jakikolwiek sensor przekroczył próg
-        sensor_tripped: set = set()
+        # sektory obserwowane przez czujniki: ten, na którym sensor przebił próg,
+        # oraz jego sąsiedzi. Dym i podwyższone stężenia gazów rozchodzą się na
+        # pobliskie sektory, więc czujnik na sąsiednim sektorze również potwierdza
+        # pożar. Bez tego ogień musiałby dorosnąć dokładnie pod czujnikiem, żeby
+        # support go zobaczył, przez co detekcja startowała z dużym opóźnieniem.
+        sensor_observed: set = set()
         for reading in sensor_readings:
             if reading.sector_id is not None and self._sensor_trips(reading):
-                sensor_tripped.add(reading.sector_id)
+                sensor_observed.add(reading.sector_id)
+                for neighbor_id, _ in self.adjacency_map.get(reading.sector_id, []):
+                    sensor_observed.add(neighbor_id)
 
         for sid, sector in next_sectors.items():
             if sid in self._detected_sectors:
                 continue
             if not sector.is_burning():
                 continue
-            if sid in sensor_tripped or sid in patrol_observed:
+            if sid in sensor_observed or sid in patrol_observed:
                 self._detected_sectors.add(sid)
                 tracker = self.metrics_tracker
                 if tracker is not None and hasattr(tracker, "on_detection"):
