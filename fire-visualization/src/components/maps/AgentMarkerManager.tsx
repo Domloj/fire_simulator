@@ -30,9 +30,9 @@ const DEFAULT = '#ff6600';
 //   - Available:     rgb(0, 200, 0)
 
 const FIRE_BRIGADE_COLORS: Record<string, string> = {
-  TRAVELLING:    '#0064ff', // rgb(0, 100, 255)
-  EXTINGUISHING: '#ff0000', // rgb(255, 0, 0)
-  AVAILABLE:     '#00c800'  // rgb(0, 200, 0)
+  TRAVELLING:    '#0064ff', // niebieski — w drodze
+  EXTINGUISHING: '#ff0000', // czerwony — gaszenie
+  AVAILABLE:     '#ffffff'  // bialy — wolna (zielony ginal na lesie)
 };
 
 // Forester Patrols:
@@ -368,8 +368,12 @@ export default function AgentMarkerManager() {
 
           el.style.width = `${markerDiameterPx}px`;
           el.style.height = `${markerDiameterPx}px`;
-          el.style.borderRadius = '50%';
-          el.style.border = '2px solid white';
+          // Brygada = kwadrat, patrol = kółko. Kształt od razu mówi typ jednostki.
+          const isBrigade = unitType === 'fireBrigade';
+          el.style.borderRadius = isBrigade ? '2px' : '50%';
+          // Brygada ma ciemną obwódkę, żeby biały (wolny) kwadrat miał kontur;
+          // patrol zostaje przy białej.
+          el.style.border = isBrigade ? '2px solid #1a1a1a' : '2px solid white';
 
           el.style.position = 'absolute';
           el.style.left = '50%';
