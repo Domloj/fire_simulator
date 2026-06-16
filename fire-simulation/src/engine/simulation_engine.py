@@ -650,30 +650,16 @@ class SimulationEngine:
             agent_type = agent_batch.get("type")
             agent_data = agent_batch.get("data", [])
             
+            # Publikujemy tylko wariant zbiorczy (batch). Wcześniej każdy agent
+            # leciał dodatkowo osobną wiadomością na własną kolejkę, a backend
+            # konsumował obie równolegle. Dwie kolejki czytane z dwóch wątków
+            # nie mają gwarancji kolejności, więc spóźniona pojedyncza wiadomość
+            # nadpisywała nowszą pozycję z batcha i agent "teleportował się".
+            # Jedna kolejka batch = FIFO z RabbitMQ, brak wyścigu.
             if agent_type == "fire_brigades":
-                # Publish individual brigade states
-                for brigade in agent_data:
-                    self.rabbitmq_publisher.publish_fire_brigade_state(
-                        brigade_id=brigade.get("fireBrigadeId"),
-                        state=brigade.get("state"),
-                        location=brigade.get("location"),
-                        sector_id=brigade.get("sectorId"),
-                        timestamp=brigade.get("timestamp")
-                    )
-                # Also publish batch variant
                 self.rabbitmq_publisher.publish_fire_brigade_batch(agent_data)
-            
+
             elif agent_type == "foresters":
-                # Publish individual forester states
-                for forester in agent_data:
-                    self.rabbitmq_publisher.publish_forester_state(
-                        forester_id=forester.get("foresterPatrolId"),
-                        state=forester.get("state"),
-                        location=forester.get("location"),
-                        sector_id=forester.get("sectorId"),
-                        timestamp=forester.get("timestamp")
-                    )
-                # Also publish batch variant
                 self.rabbitmq_publisher.publish_forester_batch(agent_data)
 
         # Feed dla FFSup: support konsumuje zagregowany stan na routing key

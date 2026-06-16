@@ -172,10 +172,12 @@ public class SimulationStateService {
     }
 
     private void subscribeToQueues() {
-        fireBrigadeFlux.subscribeOn(Schedulers.parallel())
-                .subscribe(this::processFireBrigade);
-
-        // Batch consumer for Fire Brigades
+        // Konsumujemy wyłącznie kolejki batch. Wcześniej dodatkowo subskrybowany
+        // był pojedynczy flux agentów i ten sam agent był przetwarzany dwa razy
+        // na tick, z dwóch wątków (Schedulers.parallel()). Dwie równoległe
+        // kolejki nie mają gwarancji kolejności, więc spóźniona pojedyncza
+        // wiadomość nadpisywała nowszą pozycję z batcha -> teleportujący się
+        // agenci. Jedna kolejka batch zachowuje kolejność FIFO z RabbitMQ.
         fireBrigadeBatchFlux.subscribeOn(Schedulers.parallel())
                 .subscribe(batch -> {
                     if (batch != null && batch.batch() != null) {
@@ -187,9 +189,6 @@ public class SimulationStateService {
                         log.warn("Received null fireBrigade batch or batch.batch() is null");
                     }
                 });
-
-        foresterPatrolFlux.subscribeOn(Schedulers.parallel())
-                .subscribe(this::processForesterPatrol);
 
         foresterPatrolBatchFlux.subscribeOn(Schedulers.parallel())
                 .subscribe(batch -> {
