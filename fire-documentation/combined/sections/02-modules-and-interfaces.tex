@@ -1,0 +1,1467 @@
+
+% \tableofcontents
+
+\section{Wprowadzenie}
+
+\subsection{Cel dokumentu}
+
+Dokument zawiera najbardziej techniczne szczegóły dotyczące API, kontraktów RabbitMQ, formatów JSON oraz interfejsów między modułami. 
+
+\subsection{Zakres dokumentu}
+
+\begin{itemize}
+    \item REST API wszystkich serwisów
+    \item Kontrakty RabbitMQ (kolejki, routing keys, formaty wiadomości)
+    \item Format JSON dla konfiguracji i danych
+    \item Wersjonowanie i kompatybilność wsteczną
+    \item Walidacja i obsługa błędów
+\end{itemize}
+
+\section{REST API}
+
+\subsection{FFBackend API}
+
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={Żądanie uruchomienia symulacji}
+]
+POST /simulation/run-simulation?interval=5
+Content-Type: application/json
+
+{
+  "forestName": "Test Forest",
+  "sectors": [
+    {
+      "sectorId": 1,
+      "sectorType": "FOREST",
+      "initialState": {
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0,
+        "fireState": "INACTIVE"
+      },
+      "contours": [[20.5, 49.9], [20.6, 49.9]],
+      "assignedBrigades": []
+    }
+  ],
+  "fireBrigades": [
+    {
+      "fireBrigadeId": 1,
+      "currentLocation": {"longitude": 20.5, "latitude": 49.9},
+      "state": "IDLE"
+    }
+  ],
+  "foresterPatrols": [
+    {
+      "foresterPatrolId": 1,
+      "currentLocation": {"longitude": 20.6, "latitude": 49.8},
+      "state": "PATROLLING"
+    }
+  ]
+}
+\end{lstlisting}
+
+\textbf{Przykład odpowiedzi SSE:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={Request Body}
+]
+data: 
+{  
+    "forestName":"Test Forest",
+    "timestamp":"2026-01-14T17:30:53.000Z",
+    "tick":0,
+    "sectors":[...],
+    "fireBrigades":[...],
+    "foresterPatrols":[...],
+    "recommendedActions":[...]
+}
+
+data: 
+{
+    "forestName":"Test Forest",
+    "timestamp":"2026-01-14T17:30:53.500Z",
+    "tick":1,...
+}
+\end{lstlisting}
+
+\paragraph{POST /simulation/send-simulation-request}
+
+Wysyła żądanie uruchomienia symulacji do serwisu symulacji.
+
+\textbf{Request Body:} \texttt{Configuration} (JSON)
+
+\textbf{Response:}
+\begin{itemize}
+    \item \texttt{200 OK}: "Configuration sent to simulation!"
+    \item \texttt{503 Service Unavailable}: "Simulation service unreachable"
+\end{itemize}
+
+\paragraph{POST /simulation/orderFireBrigade}
+
+Wysyła komendę do brygady pożarniczej.
+
+\textbf{Request Body:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "id": 1,
+  "location": {
+    "longitude": 20.5,
+    "latitude": 49.9
+  },
+  "goToBase": false
+}
+\end{lstlisting}
+
+\textbf{Response:}
+\begin{itemize}
+    \item \texttt{200 OK}: "Order forwarded to simulation"
+    \item \texttt{202 Accepted}: "Simulation unreachable; order queued"
+    \item \texttt{503 Service Unavailable}: "Simulation unreachable and enqueue failed"
+\end{itemize}
+
+\paragraph{POST /simulation/orderForestPatrol}
+
+Wysyła komendę do patrolu leśnego. Format identyczny jak \texttt{orderFireBrigade}.
+
+\paragraph{POST /simulation/assignBrigades}
+
+Przypisuje wiele brygad do sektora.
+
+\textbf{Request Body:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "sectorId": 5,
+  "assignedBrigades": [1, 2, 3]
+}
+\end{lstlisting}
+
+\textbf{Response:}
+\begin{itemize}
+    \item \texttt{200 OK}: "AssignBrigades forwarded to simulation"
+    \item \texttt{503 Service Unavailable}: "Simulation service unreachable"
+\end{itemize}
+
+\paragraph{POST /simulation/stop-simulation}
+
+Zatrzymuje uruchomioną symulację.
+
+\textbf{Request Body:} Puste lub \texttt{""}
+
+\textbf{Response:}
+\begin{itemize}
+    \item \texttt{200 OK}: "Stop request sent!"
+    \item \texttt{503 Service Unavailable}: "Simulation service unreachable"
+\end{itemize}
+
+\textbf{Nie w pełni zaimplementowane! Zobacz dokument issues}
+
+\paragraph{POST /simulation/set-speed}
+
+Ustawia prędkość symulacji.
+
+\textbf{Query Parameters:}
+\begin{itemize}
+    \item \texttt{tickInterval} (Double, wymagany): Interwał ticka symulacji w sekundach (musi być > 0)
+\end{itemize}
+
+\textbf{Response:}
+\begin{itemize}
+    \item \texttt{200 OK}: "Simulation speed updated"
+    \item \texttt{400 Bad Request}: "tickInterval must be > 0"
+    \item \texttt{503 Service Unavailable}: "Simulation service unreachable"
+\end{itemize}
+
+\textbf{Nie w pełni zaimplementowane! Zobacz dokument issues}
+
+\subsubsection{Legacy Endpoints}
+
+Dla kompatybilności wstecznej dostępne są również:
+\begin{itemize}
+    \item \texttt{POST /orderFireBrigade} (alias dla \texttt{/simulation/orderFireBrigade})
+    \item \texttt{POST /orderForestPatrol} (alias dla \texttt{/simulation/orderForestPatrol})
+\end{itemize}
+
+\subsubsection{Error Responses}
+
+Standardowy format błędu:
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "status": 503,
+  "error": "Service Unavailable",
+  "message": "Simulation service unreachable",
+  "path": "/simulation/orderFireBrigade"
+}
+\end{lstlisting}
+
+\subsubsection{CORS}
+
+Wszystkie endpointy wspierają CORS z \texttt{Access-Control-Allow-Origin: *} (konfigurowalne przez \texttt{WebConfig}).
+
+\subsection{FFConf API}
+
+\texttt{http://localhost:31415} (konfigurowalne przez \texttt{CONFIG\_PORT})
+
+\subsubsection{Endpoints}
+
+\begin{itemize}
+  \item \textbf{GET /api/v1/nodes} -- Pobiera listę węzłów konfiguracji.
+  \item \textbf{GET /api/v1/nodes/\{nodeId\}} -- Pobiera szczegóły węzła konfiguracji.
+  \item \textbf{POST /api/v1/nodes} -- Tworzy nowy węzeł konfiguracji.
+  \item \textbf{GET /health} -- Sprawdza status serwisu.
+  \item \textbf{POST /admin/reload-configs} - Przeładowuje konfiguracje z dysku
+\end{itemize}
+
+\textbf{Query Parameters:}
+\begin{itemize}
+    \item \texttt{force} (bool, opcjonalny): Jeśli \texttt{true}, czyści kolekcję przed importem
+\end{itemize}
+
+\section{RabbitMQ Contracts}
+
+\subsection{Exchange Configuration}
+
+Wszystkie kolejki używają exchange typu \texttt{topic} o nazwie \texttt{fire-simulation-exchange} (konfigurowalne przez \texttt{RABBITMQ\_EXCHANGE}).
+
+\subsection{Aktywne kolejki (wg backendu)}
+
+Poniższa lista pochodzi z \texttt{DeclaredQueues} w backendzie i obejmuje tylko realnie używane kolejki; pomijamy kolejki oznaczone w kodzie jako \textit{NOT USED} (np. LLM chat).
+
+\subsubsection{Telemetry FROM simulator}
+\begin{itemize}
+  \item \texttt{simulation\_telemetry\_agents\_fire\_brigade}
+  \item \texttt{simulation\_telemetry\_agents\_fire\_brigade\_batch}
+  \item \texttt{simulation\_telemetry\_agents\_forester}
+  \item \texttt{simulation\_telemetry\_agents\_forester\_batch}
+  \item \texttt{simulation\_telemetry\_sensors\_temp\_humidity}
+  \item \texttt{simulation\_telemetry\_sensors\_wind\_speed}
+  \item \texttt{simulation\_telemetry\_sensors\_wind\_direction}
+  \item \texttt{simulation\_telemetry\_sensors\_litter\_moisture}
+  \item \texttt{simulation\_telemetry\_sensors\_co2}
+  \item \texttt{simulation\_telemetry\_sensors\_pm2\_5}
+  \item \texttt{simulation\_telemetry\_sensors\_camera}
+  \item \texttt{simulation\_telemetry\_map\_sector\_state}
+  \item \texttt{simulation\_telemetry\_map\_sector\_state\_fast}
+\end{itemize}
+
+\subsubsection{Support / rekomendacje / agregacja}
+\begin{itemize}
+  \item \texttt{support\_analysis\_requests}
+  \item \texttt{support\_recommendations}
+  \item \texttt{support\_data\_aggregated}
+  \item \texttt{simulation\_recommendations}
+  \item \texttt{support\_analytics\_insights}
+\end{itemize}
+
+\subsubsection{Kolejki nieużywane (w kodzie oznaczone jako NOT USED)}
+\begin{itemize}
+  \item \texttt{backend\_llm\_requests}, \texttt{backend\_llm\_responses}
+  \item \texttt{support\_llm\_propositions}, \texttt{support\_llm\_propositions\_responses}
+  \item \texttt{support\_llm\_requests}, \texttt{support\_llm\_responses}
+  \item \texttt{backend\_tasks\_queue}, \texttt{backend\_data\_aggregated}, \texttt{backend\_commands\_user}
+\end{itemize}
+
+\textbf{Uwaga:} Nazwa exchange jest konfigurowalna (\texttt{RABBITMQ\_EXCHANGE}). W środowisku lokalnym w plikach \texttt{.local.env} może występować \texttt{fire\_updates};
+
+\subsection{Kolejki przychodzące (FROM Simulation)}
+
+\subsubsection{simulation\_telemetry\_agents\_fire\_brigade}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.agents.fire\_brigade}
+
+\textbf{Event Model:} \texttt{EvFireBrigade}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "fireBrigadeId": 1,
+  "sectorId": 5,
+  "location": {
+    "longitude": 20.5,
+    "latitude": 49.9
+  },
+  "state": "EXTINGUISHING"
+}
+\end{lstlisting}
+
+\textbf{Required Fields:}
+\begin{itemize}
+    \item \texttt{fireBrigadeId} (int): Unikalny identyfikator brygady
+    \item \texttt{location} (Location): Aktualne współrzędne GPS
+    \item \texttt{state} (FireBrigadeState): Aktualny stan (EXTINGUISHING, IDLE, MOVING, etc.)
+\end{itemize}
+
+\textbf{Optional Fields:}
+\begin{itemize}
+    \item \texttt{sectorId} (Integer): ID sektora jeśli znane, w przeciwnym razie rozwiązywane z location
+\end{itemize}
+
+\subsubsection{simulation\_telemetry\_agents\_forester}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.agents.forester}
+
+\textbf{Event Model:} \texttt{EvForestPatrol}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "foresterPatrolId": 1,
+  "sectorId": 3,
+  "location": {
+    "longitude": 20.6,
+    "latitude": 49.8
+  },
+  "state": "PATROLLING"
+}
+\end{lstlisting}
+
+\subsubsection{simulation\_telemetry\_map\_sector\_state}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.map.sector\_state}
+
+\textbf{Event Model:} \texttt{EvSectorState}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "sectorId": 1,
+  "fireLevel": 25.5,
+  "burnLevel": 10.2,
+  "extinguishLevel": 5.0
+}
+\end{lstlisting}
+
+\textbf{Required Fields:}
+\begin{itemize}
+    \item \texttt{sectorId} (int): Identyfikator sektora
+    \item \texttt{fireLevel} (double): Aktualna intensywność ognia (0-100)
+    \item \texttt{burnLevel} (double): Procent spalenia (0-100)
+    \item \texttt{extinguishLevel} (double): Postęp gaszenia (0-100)
+\end{itemize}
+
+\textbf{Optimization Note:} Powinny być wysyłane tylko zmienione sektory, nie wszystkie sektory za każdym razem.
+
+\subsubsection{Czujniki}
+
+Wszystkie kolejki czujników używają tego samego wzorca z routing opartym na lokalizacji.
+
+\paragraph{simulation\_telemetry\_sensors\_temp\_humidity}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.temp\_humidity}
+
+\textbf{Event Model:} \texttt{EvTempAndAirHumiditySensor}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "sensorId": 1,
+  "timestamp": "2026-01-14T17:30:53",
+  "sensorType": "TEMP_AND_AIR_HUMIDITY",
+  "location": {
+    "longitude": 20.5,
+    "latitude": 49.9
+  },
+  "data": {
+    "temperature": 25.5,
+    "airHumidity": 60.0
+  }
+}
+\end{lstlisting}
+
+\paragraph{simulation\_telemetry\_sensors\_wind\_speed}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.wind\_speed}
+
+\textbf{Event Model:} \texttt{EvWindSpeedSensor}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "sensorId": 2,
+  "location": {"longitude": 20.5, "latitude": 49.9},
+  "data": {
+    "windSpeed": 15.5
+  }
+}
+\end{lstlisting}
+
+\paragraph{simulation\_telemetry\_sensors\_wind\_direction}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.wind\_direction}
+
+\textbf{Event Model:} \texttt{EvWindDirectionSensor}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "sensorId": 3,
+  "location": {"longitude": 20.5, "latitude": 49.9},
+  "data": {
+    "windDirection": 270.0
+  }
+}
+\end{lstlisting}
+
+\textbf{Required:} \texttt{data.windDirection} (double): Kierunek w stopniach (0-360)
+
+\paragraph{simulation\_telemetry\_sensors\_litter\_moisture}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.litter\_moisture}
+
+\textbf{Event Model:} \texttt{EvLitterMoistureSensor}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]
+{
+  "sensorId": 4,
+  "location": {"longitude": 20.5, "latitude": 49.9},
+  "data": {
+    "litterMoisture": 45.0
+  }
+}
+\end{lstlisting}
+
+\paragraph{simulation\_telemetry\_sensors\_co2}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.co2}
+
+\textbf{Event Model:} \texttt{EvCO2Sensor}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "sensorId": 5,
+  "location": {"longitude": 20.5, "latitude": 49.9},
+  "data": {
+    "co2Concentration": 420.0
+  }
+}
+\end{lstlisting}
+
+\paragraph{simulation\_telemetry\_sensors\_pm2\_5}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.pm2\_5}
+
+\textbf{Event Model:} \texttt{EvPM25ConcentrationSensor}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "sensorId": 6,
+  "location": {"longitude": 20.5, "latitude": 49.9},
+  "data": {
+    "pm2_5Concentration": 25.5
+  }
+}
+\end{lstlisting}
+
+\paragraph{simulation\_telemetry\_sensors\_camera}
+
+\textbf{Routing Key:} \texttt{simulation.telemetry.sensors.camera}
+
+\textbf{Event Model:} \texttt{EvCamera}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "sensorId": 7,
+  "location": {"longitude": 20.5, "latitude": 49.9},
+  "data": {
+    "smokeLevel": 15.0
+  }
+}
+\end{lstlisting}
+
+\textbf{Note:} Obecnie logowane, ale nie w pełni przetwarzane w backendzie.
+
+\subsubsection{simulation\_recommendations}
+
+\textbf{Routing Key:} \texttt{simulation.recommendations}
+
+\textbf{Event Model:} \texttt{EvRecommendation}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "timestamp": "2026-01-14T17:30:53",
+  "recommendedActions": [
+    {
+      "unitId": 1,
+      "sectorId": 5,
+      "actionType": "EXTINGUISH"
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsection{Kolejki wychodzące (TO Simulation/Support)}
+
+\subsubsection{support\_data\_aggregated}
+
+\textbf{Routing Key:} \texttt{support.aggregated.data}
+
+\textbf{Payload:} \texttt{SimulationStateDto} (zoptymalizowany -- tylko zmienione encje)
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "forestName": "Forest Name",
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "tick": 100,
+  "sectors": [
+    {
+      "sectorId": 1,
+      "state": {
+        "fireLevel": 25.5,
+        "burnLevel": 10.2,
+        "extinguishLevel": 5.0,
+        "fireState": "ACTIVE"
+      },
+      "contours": [[20.5, 49.9], [20.6, 49.9]],
+      "assignedBrigades": [1, 2]
+    }
+  ],
+  "fireBrigades": [ /* tylko zmienione brygady */ ],
+  "foresterPatrols": [ /* tylko zmienione patrole */ ],
+  "recommendedActions": [ /* tylko nowe rekomendacje */ ]
+}
+\end{lstlisting}
+
+\textbf{Optimization:}
+\begin{itemize}
+    \item \textbf{Pierwsza wiadomość:} Pełny stan (wszystkie sektory, brygady, patrole)
+    \item \textbf{Kolejne wiadomości:} Tylko zmienione encje
+    \begin{itemize}
+        \item Tylko sektory ze zmienionym fireLevel, burnLevel, extinguishLevel lub assignedBrigades
+        \item Tylko brygady ze zmienioną lokalizacją, stanem lub sectorId
+        \item Tylko patrole ze zmienioną lokalizacją, stanem lub sectorId
+        \item Tylko nowe rekomendacje (nie wcześniej wysłane)
+    \end{itemize}
+\end{itemize}
+
+\textbf{Performance Impact:} Redukcja transferu danych o 80-95\% w typowych scenariuszach.
+
+\subsubsection{simulation\_control\_fire\_brigade\_actions}
+
+\textbf{Routing Key:} \texttt{simulation.control.fire\_brigade\_actions}
+
+\textbf{Payload:} \texttt{OrderFireBrigade}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "fireBrigadeId": 1,
+  "action": "EXTINGUISH",
+  "sectorId": null,
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "location": {
+    "longitude": 20.5,
+    "latitude": 49.9
+  }
+}
+\end{lstlisting}
+
+\textbf{Required Fields:}
+\begin{itemize}
+    \item \texttt{fireBrigadeId} (int): Brygada do rozkazania
+    \item \texttt{action} (FireBrigadeAction): EXTINGUISH lub GO\_TO\_BASE
+    \item \texttt{location} (Location): Docelowa lokalizacja (null dla GO\_TO\_BASE)
+\end{itemize}
+
+\subsubsection{simulation\_control\_forester\_actions}
+
+\textbf{Routing Key:} \texttt{simulation.control.forester\_actions}
+
+\textbf{Payload:} \texttt{OrderForesterPatrol}
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "foresterPatrolId": 1,
+  "action": "PATROL",
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "location": {
+    "longitude": 20.5,
+    "latitude": 49.9
+  }
+}
+\end{lstlisting}
+
+\subsubsection{support.recommendations}
+
+\textbf{Routing Key:} \texttt{support.recommendations}
+
+\textbf{Direction:} Publisher (wysyła do backend/frontend)
+
+\textbf{Contract:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "timestamp": 1234567890.0,
+  "recommendedActions": [
+    {
+      "unitId": 1,
+      "sectorId": 5
+    }
+  ],
+  "priority": "HIGH"
+}
+\end{lstlisting}
+
+\textbf{Required Fields:}
+\begin{itemize}
+    \item \texttt{timestamp} (float): Unix timestamp w sekundach
+    \item \texttt{recommendedActions} (List): Lista akcji (musi być niepusta)
+    \item \texttt{priority} (str): "LOW", "MEDIUM" lub "HIGH"
+\end{itemize}
+
+\section{Formaty JSON}
+
+\subsection{Configuration}
+
+Format konfiguracji lasu używany do inicjalizacji symulacji.
+
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "forestName": "Test Forest",
+  "rows": 10,
+  "columns": 10,
+  "location": [
+    {"latitude": 49.9, "longitude": 20.5},
+    {"latitude": 49.9, "longitude": 20.6},
+    {"latitude": 49.8, "longitude": 20.6},
+    {"latitude": 49.8, "longitude": 20.5}
+  ],
+  "sectors": [
+    {
+      "sectorId": 1,
+      "row": 0,
+      "column": 0,
+      "sectorType": "FOREST",
+      "initialState": {
+        "fireLevel": 0,
+        "burnLevel": 0,
+        "extinguishLevel": 0,
+        "fireState": "INACTIVE",
+        "temperature": 20.0,
+        "airHumidity": 60.0,
+        "windSpeed": 10.0,
+        "windDirection": 270.0,
+        "litterMoisture": 50.0,
+        "co2Concentration": 400.0,
+        "pm2_5Concentration": 20.0
+      },
+      "contours": [
+        [20.5, 49.9],
+        [20.51, 49.9],
+        [20.51, 49.89],
+        [20.5, 49.89]
+      ],
+      "assignedBrigades": []
+    }
+  ],
+  "fireBrigades": [
+    {
+      "fireBrigadeId": 1,
+      "currentLocation": {
+        "longitude": 20.5,
+        "latitude": 49.9
+      },
+      "baseLocation": {
+        "longitude": 20.5,
+        "latitude": 49.9
+      },
+      "state": "IDLE"
+    }
+  ],
+  "foresterPatrols": [
+    {
+      "foresterPatrolId": 1,
+      "currentLocation": {
+        "longitude": 20.6,
+        "latitude": 49.8
+      },
+      "baseLocation": {
+        "longitude": 20.6,
+        "latitude": 49.8
+      },
+      "state": "PATROLLING"
+    }
+  ],
+  "sensors": [
+    {
+      "sensorId": 1,
+      "sensorType": "TEMP_AND_AIR_HUMIDITY",
+      "location": {
+        "longitude": 20.5,
+        "latitude": 49.9
+      }
+    }
+  ],
+  "cameras": [
+    {
+      "cameraId": 1,
+      "location": {
+        "longitude": 20.5,
+        "latitude": 49.9
+      }
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsection{SimulationStateDto}
+
+Format stanu symulacji wysyłany przez SSE.
+
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "forestName": "Test Forest",
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "tick": 100,
+  "sectors": [
+    {
+      "sectorId": 1,
+      "state": {
+        "fireLevel": 25.5,
+        "burnLevel": 10.2,
+        "extinguishLevel": 5.0,
+        "fireState": "ACTIVE"
+      },
+      "contours": [[20.5, 49.9], [20.6, 49.9]],
+      "assignedBrigades": [1, 2]
+    }
+  ],
+  "fireBrigades": [
+    {
+      "fireBrigadeId": 1,
+      "location": {
+        "longitude": 20.5,
+        "latitude": 49.9
+      },
+      "state": "EXTINGUISHING",
+      "sectorId": 5
+    }
+  ],
+  "foresterPatrols": [
+    {
+      "foresterPatrolId": 1,
+      "location": {
+        "longitude": 20.6,
+        "latitude": 49.8
+      },
+      "state": "PATROLLING",
+      "sectorId": 3
+    }
+  ],
+  "recommendedActions": [
+    {
+      "unitId": 1,
+      "sectorId": 5
+    }
+  ]
+}
+\end{lstlisting}
+
+\section{Obsługa błędów}
+
+\subsection{Resource Not Found Errors}
+
+Gdy zasób (sektor, brygada, patrol) nie zostanie znaleziony, błąd jest logowany z:
+\begin{itemize}
+    \item \textbf{Level:} ERROR
+    \item \textbf{Format wiadomości:} \texttt{"Resource not found: \{ResourceType\} \{id\} does not exist when \{action\} at location \{location\}"}
+    \item \textbf{Przykład:} \texttt{"Resource not found: Sector 5 does not exist when updating wind speed sensor at location Location[longitude=20.5, latitude=49.9]"}
+\end{itemize}
+
+Te błędy są logowane, ale nie powodują crashowania serwisu. Wiadomość jest pomijana i przetwarzanie kontynuowane.
+
+\subsection{Sector Resolution}
+
+Gdy \texttt{sectorId} nie jest podane w przychodzących wiadomościach:
+\begin{enumerate}
+    \item Sektor jest rozwiązywany z lokalizacji używając \texttt{SectorIdResolver}
+    \item Jeśli rozwiązanie się nie powiedzie, błąd jest logowany i wiadomość pomijana
+    \item Jeśli sektory nie mają jeszcze konturów, wiadomość jest odroczona do czasu dostępności konturów
+\end{enumerate}
+
+\section{Optymalizacje wydajności}
+
+\subsection{Delta Updates}
+
+Tylko zmienione encje są wysyłane do serwisu wsparcia, co redukuje ruch sieciowy o 80-95\%.
+
+\subsection{Synchronizacja}
+
+Wszystkie aktualizacje stanu używają bloków \texttt{synchronized(currentState)}, co zapobiega warunkom wyścigu. Rozważ użycie \texttt{ConcurrentHashMap} dla przyszłych ulepszeń.
+
+\subsection{Message Filtering}
+
+Wiadomości z czujników są pomijane, jeśli sektory nie mają jeszcze konturów, co zapobiega błędom podczas fazy inicjalizacji.
+
+\section{Wersjonowanie i kompatybilność wsteczna}
+
+\subsection{Obecny stan wersjonowania}
+
+\textbf{Aktualna wersja systemu:} 1.0.0 (pre-release)
+
+\textbf{Wersje API:}
+\begin{itemize}
+    \item \textbf{FFBackend:} Brak formalnego wersjonowania (bez prefiksu \texttt{/api/v1/})
+    \item \textbf{FFConf:} Wersjonowane (\texttt{/api/v1/nodes})
+    \item \textbf{RabbitMQ:} Brak pola \texttt{version} w wiadomościach
+\end{itemize}
+
+\subsection{Planowane wersjonowanie}
+
+\subsubsection{REST API}
+
+\textbf{Format:} \texttt{/api/v\{major\}/\{resource\}}
+
+\textbf{Przykład:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]GET /api/v1/simulation/status
+POST /api/v1/simulation/run-simulation
+\end{lstlisting}
+
+\textbf{Migracja:} Legacy endpointy (bez \texttt{/api/v1/}) będą działać jako alias do \texttt{v1} przez 6 miesięcy.
+
+\subsubsection{RabbitMQ Messages}
+
+\textbf{Format:} Pole \texttt{version} w każdej wiadomości
+
+\textbf{Przykład:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] 
+{
+  "version": "1.0",
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "data": {
+    "sectorId": 1,
+    "fireLevel": 25.5
+  }
+}
+\end{lstlisting}
+
+\textbf{Alternatywa:} Routing key z wersją (np. \texttt{simulation.telemetry.v1.sectors})
+
+\subsection{Breaking vs Non-Breaking Changes}
+
+\subsubsection{Breaking Changes}
+
+\textbf{Definicja:} Zmiana wymagająca aktualizacji kodu klienta.
+
+\textbf{Przykłady:}
+\begin{itemize}
+    \item Usunięcie wymaganego pola (np. \texttt{fireBrigadeId})
+    \item Zmiana typu pola (np. \texttt{sectorId: int} → \texttt{string})
+    \item Zmiana nazwy pola (np. \texttt{fireLevel} → \texttt{intensity})
+    \item Zmiana semantyki (np. \texttt{fireLevel} w skali 0-100 → 0-1)
+    \item Zmiana routing key RabbitMQ
+    \item Usunięcie endpointu API
+\end{itemize}
+
+\textbf{Procedura wprowadzenia:}
+\begin{enumerate}
+    \item Oznacz starą wersję jako \texttt{@Deprecated} (minimum 3 miesiące przed usunięciem)
+    \item Dodaj nową wersję API równolegle (np. \texttt{/api/v2/})
+    \item Dokumentuj zmianę w \texttt{CHANGELOG.md} i \texttt{MIGRATION\_GUIDE.md}
+    \item Dodaj response header \texttt{X-Deprecated: true} do starych endpointów
+    \item Loguj WARNING gdy stary endpoint jest używany
+    \item Wyślij komunikat do użytkowników (email, dokumentacja)
+    \item Usuń starą wersję po okresie deprecation
+\end{enumerate}
+
+\subsubsection{Non-Breaking Changes}
+
+\textbf{Definicja:} Zmiana niewymagająca aktualizacji kodu klienta.
+
+\textbf{Przykłady:}
+\begin{itemize}
+    \item Dodanie opcjonalnego pola (np. \texttt{extinguishProgress})
+    \item Dodanie nowego endpointu (np. \texttt{/simulation/pause})
+    \item Dodanie nowej kolejki RabbitMQ
+    \item Rozszerzenie enum (np. \texttt{FireState} + \texttt{SMOLDERING})
+    \item Zwiększenie limitu pola (np. \texttt{max fireLevel: 100} → \texttt{200})
+\end{itemize}
+
+\textbf{Procedura wprowadzenia:}
+\begin{enumerate}
+    \item Dodaj nowe pole/endpoint/kolejkę
+    \item Dokumentuj w \texttt{CHANGELOG.md}
+    \item Zachowaj backward compatibility (stare klienty działają bez zmian)
+    \item Dodaj testy regresji
+\end{enumerate}
+
+\subsection{Deprecation Policy}
+
+\subsubsection{Zasady}
+
+\begin{itemize}
+    \item \textbf{Minimalny okres wsparcia:} 3 miesiące od oznaczenia jako deprecated
+    \item \textbf{Komunikacja:}
+    \begin{itemize}
+        \item Response header \texttt{X-Deprecated: true}
+        \item Response header \texttt{X-Deprecated-Sunset: 2026-04-01}
+        \item Warning w logach serwera
+        \item Notice w dokumentacji API
+    \end{itemize}
+    \item \textbf{Dokumentacja:} Oznaczenie w API docs jako \texttt{[DEPRECATED -- use /api/v2/endpoint instead]}
+\end{itemize}
+
+\subsubsection{Przykład Deprecation Notice}
+
+\textbf{HTTP Response:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]HTTP/1.1 200 OK
+X-Deprecated: true
+X-Deprecated-Sunset: 2026-04-01
+X-Deprecated-Replacement: /api/v2/simulation/run-simulation
+Content-Type: application/json
+
+{
+  "message": "This endpoint is deprecated and will be removed on 2026-04-01",
+  "replacement": "/api/v2/simulation/run-simulation",
+  "data": { ... }
+}
+\end{lstlisting}
+
+\subsection{Migration Guide}
+
+W przypadku breaking changes, dokumentacja powinna zawierać:
+
+\subsubsection{Format Migration Guide}
+
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]# Migration Guide: v1 -> v2
+
+## Breaking Changes
+
+### 1. sectorId type changed: int -> string
+
+**Before (v1):**
+{
+  "sectorId": 1,
+  "fireLevel": 25.5
+}
+
+**After (v2):**
+{
+  "sectorId": "sector-001",
+  "fireLevel": 25.5
+}
+
+**Migration:**
+Convert sectorId to string with "sector-" prefix:
+  v2_sectorId = "sector-" + str(v1_sectorId).zfill(3)
+
+**Timeline:**
+- v1 deprecated: 2026-02-01
+- v1 removed: 2026-05-01
+\end{lstlisting}
+
+\subsection{Versioning dla różnych komponentów}
+
+\subsubsection{REST API Versioning}
+
+\textbf{Strategia:} URL Path Versioning
+
+\textbf{Przykład:}
+\begin{itemize}
+    \item \texttt{/api/v1/simulation/run-simulation} (current)
+    \item \texttt{/api/v2/simulation/run-simulation} (future)
+\end{itemize}
+
+\textbf{Alternatywy odrzucone:}
+\begin{itemize}
+    \item \textit{Header Versioning} (\texttt{Accept: application/vnd.fire-sim.v1+json}) -- zbyt skomplikowane dla małego projektu
+    \item \textit{Query Parameter} (\texttt{?version=1}) -- trudniejsze do cachowania
+\end{itemize}
+
+\subsubsection{RabbitMQ Message Versioning}
+
+\textbf{Strategia:} Message Field Versioning
+
+\textbf{Przykład:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] {
+  "version": "1.0",
+  "data": { ... }
+}
+\end{lstlisting}
+
+\textbf{Routing Key:} Bez wersji (stabilny: \texttt{simulation.telemetry.sectors})
+
+\textbf{Uzasadnienie:} Routing key z wersją (\texttt{simulation.telemetry.v1.sectors}) wymaga rekonfiguracji exchanges przy każdej zmianie.
+
+\subsubsection{JSON Schema Versioning}
+
+\textbf{Strategia:} Schema ID w konfiguracji
+
+\textbf{Przykład:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] {
+  "$schema": "https://fire-sim.org/schemas/configuration/v1.json",
+  "forestName": "Test Forest",
+  ...
+}
+\end{lstlisting}
+
+\subsection{Changelog Format}
+
+\textbf{Standard:} Keep a Changelog + Semantic Versioning
+
+\textbf{Przykład:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]# Changelog
+
+## [1.1.0] - 2026-02-01
+
+### Added
+- FFBackend: POST /simulation/pause endpoint
+- RabbitMQ: alerts.notifications queue
+- FFSup: LLM coordination mode
+
+### Changed
+- FFSim: fireLevel calculation formula (non-breaking)
+- FFBackend: Improved delta update performance
+
+### Deprecated
+- FFBackend: /orderFireBrigade (use /api/v1/commands/fire-brigade)
+- RabbitMQ: simulation_telemetry_agents_fire_brigade queue name
+  (use simulation.telemetry.agents.fire_brigade)
+
+### Removed
+- None
+
+### Fixed
+- FFBackend: SSE connection timeout after 60s
+- FFSim: Race condition in sector state updates
+
+### Security
+- FFConf: Added input validation for node creation
+
+## [1.0.0] - 2026-01-15
+
+### Added
+- Initial release
+- All core modules (FFBackend, FFSim, FFSup, FFVis, FFConf)
+- RabbitMQ integration
+- MCTS decision engine
+\end{lstlisting}
+
+\section{Error Handling \& Retry Policies}
+
+\subsection{HTTP Error Handling}
+
+\subsubsection{Standardowy format błędu}
+
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] {
+  "timestamp": "2026-01-14T17:30:53.000Z",
+  "status": 503,
+  "error": "Service Unavailable",
+  "message": "Simulation service unreachable",
+  "path": "/simulation/orderFireBrigade",
+  "traceId": "abc123xyz" // opcjonalnie dla debugowania
+}
+\end{lstlisting}
+
+\subsubsection{Kody błędów HTTP}
+
+\begin{longtable}{|l|l|p{6cm}|}
+\hline
+\textbf{Kod} & \textbf{Nazwa} & \textbf{Kiedy używany} \\
+\hline
+400 & Bad Request & Nieprawidłowe dane wejściowe (np. \texttt{fireBrigadeId} < 0) \\
+\hline
+404 & Not Found & Zasób nie istnieje (np. brygada o ID=999) \\
+\hline
+409 & Conflict & Stan konfliktu (np. brygada już wykonuje akcję) \\
+\hline
+422 & Unprocessable Entity & Semantycznie nieprawidłowe (np. brygada poza mapą) \\
+\hline
+500 & Internal Server Error & Nieoczekiwany błąd serwera \\
+\hline
+503 & Service Unavailable & Zależny serwis niedostępny (np. FFSim offline) \\
+\hline
+504 & Gateway Timeout & Timeout komunikacji z serwisem (> 5s) \\
+\hline
+\end{longtable}
+
+\subsection{Retry Policies}
+
+\subsubsection{FFBackend → FFSim (HTTP)}
+
+\textbf{Strategia:} Exponential Backoff + Fallback do RabbitMQ
+
+\textbf{Parametry:}
+\begin{itemize}
+    \item \textbf{Próby:} 3 (initial + 2 retries)
+    \item \textbf{Timeout:} 5s per request
+    \item \textbf{Backoff:} 1s, 2s, 4s
+    \item \textbf{Fallback:} Jeśli wszystkie próby nieudane → kolejka RabbitMQ
+\end{itemize}
+
+\textbf{Pseudokod:}
+\begin{lstlisting}[language=Python]
+def send_command_to_simulator(command):
+    for attempt in [1, 2, 3]:
+        try:
+            response = http.post(
+                url="http://simulator:5000/command",
+                json=command,
+                timeout=5
+            )
+            if response.status == 200:
+                return response
+        except Timeout:
+            if attempt < 3:
+                sleep(2 ** (attempt - 1))  # 1s, 2s, 4s
+            else:
+                # Fallback to RabbitMQ
+                rabbitmq.publish(
+                    queue="simulation.commands",
+                    message=command
+                )
+                return {"status": "queued"}
+\end{lstlisting}
+
+\subsubsection{RabbitMQ Consumer Retry}
+
+\textbf{Strategia:} Dead Letter Queue (DLQ) + Manual Requeue
+
+\textbf{Parametry:}
+\begin{itemize}
+    \item \textbf{Próby:} 3 (przez \texttt{x-delivery-count} header)
+    \item \textbf{Backoff:} 5s, 30s, 300s (przez TTL na DLQ)
+    \item \textbf{DLQ:} \texttt{simulation.telemetry.dlq}
+\end{itemize}
+
+\textbf{Przepływ:}
+\begin{enumerate}
+    \item Wiadomość konsumowana z \texttt{simulation.telemetry.sectors}
+    \item Jeśli przetwarzanie fail → \texttt{nack(requeue=false)}
+    \item Wiadomość trafia do DLQ
+    \item DLQ ma TTL (5s, 30s, 300s w zależności od \texttt{x-delivery-count})
+    \item Po TTL wiadomość wraca do głównej kolejki
+    \item Jeśli \texttt{x-delivery-count} > 3 → wiadomość trafia do \texttt{simulation.telemetry.failed}
+\end{enumerate}
+
+\subsubsection{Circuit Breaker Pattern}
+
+\textbf{Cel:} Zapobieganie przeciążeniu FFSim przez FFBackend
+
+\textbf{Stany:}
+\begin{itemize}
+    \item \textbf{CLOSED:} Normalny ruch (wszystkie requesty przechodzą)
+    \item \textbf{OPEN:} Circuit otwarty (wszystkie requesty natychmiast failują → fallback do RabbitMQ)
+    \item \textbf{HALF\_OPEN:} Testowanie (pojedyncze requesty testują czy serwis działa)
+\end{itemize}
+
+\textbf{Parametry:}
+\begin{itemize}
+    \item \textbf{Threshold:} 5 błędów z rzędu → OPEN
+    \item \textbf{Timeout:} 30s w stanie OPEN → HALF\_OPEN
+    \item \textbf{Success Threshold:} 2 udane requesty → CLOSED
+\end{itemize}
+
+\textbf{Implementacja:} Netflix Hystrix lub Resilience4j
+
+\subsection{Idempotency}
+
+\subsubsection{Problem}
+
+Retry może spowodować duplikację komend (np. brygada otrzymuje 2x ten sam rozkaz).
+
+\subsubsection{Rozwiązanie}
+
+\textbf{Idempotency Key:} Każda komenda ma unikalny \texttt{commandId}
+
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+] {
+  "commandId": "uuid-abc-123",
+  "fireBrigadeId": 1,
+  "targetSectorId": 5,
+  "command": "MOVE"
+}
+\end{lstlisting}
+
+\textbf{Cache:} FFSim przechowuje \texttt{commandId} w cache (Redis lub in-memory) na 5 minut
+
+\textbf{Logika:}
+\begin{lstlisting}[language=Python]
+def process_command(command):
+    if cache.exists(command.commandId):
+        return {"status": "already_processed"}
+    
+    cache.set(command.commandId, ttl=300)  # 5 min
+    execute_command(command)
+    return {"status": "ok"}
+\end{lstlisting}
+
+\subsection{Rate Limiting}
+
+\subsubsection{FFBackend API}
+
+\textbf{Limity:}
+\begin{itemize}
+    \item \textbf{Global:} 100 requests/second (wszystkie endpointy)
+    \item \textbf{Per endpoint:} 
+    \begin{itemize}
+        \item \texttt{/simulation/run-simulation}: 1 request/5s (bo startuje nową symulację)
+        \item \texttt{/simulation/orderFireBrigade}: 10 requests/second
+    \end{itemize}
+\end{itemize}
+
+\textbf{Response gdy limit przekroczony:}
+\begin{lstlisting}[
+  float,
+  placement=H,
+  caption={}
+]HTTP/1.1 429 Too Many Requests
+Retry-After: 5
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1642181053
+
+{
+  "error": "Rate limit exceeded",
+  "message": "Max 10 requests per second"
+}
+\end{lstlisting}
+
+\subsubsection{RabbitMQ Backpressure}
+
+\textbf{Problem:} FFBackend nie nadąża z przetwarzaniem telemetrii → kolejka rośnie
+
+\textbf{Rozwiązanie:}
+\begin{itemize}
+    \item \textbf{Queue Length Limit:} 10,000 wiadomości (po przekroczeniu stare są odrzucane)
+    \item \textbf{TTL:} 60s (stare wiadomości są usuwane)
+    \item \textbf{Prefetch:} 100 (consumer pobiera max 100 wiadomości naraz)
+\end{itemize}
+
+\subsection{Timeout Configuration}
+
+\begin{longtable}{|l|l|p{5cm}|}
+\hline
+\textbf{Połączenie} & \textbf{Timeout} & \textbf{Uzasadnienie} \\
+\hline
+FFBackend → FFSim (HTTP) & 5s & Symulacja powinna odpowiedzieć szybko \\
+\hline
+FFVis → FFBackend (HTTP) & 10s & Użytkownik czeka max 10s \\
+\hline
+SSE Keep-Alive & 30s & Ping co 30s zapobiega disconnect \\
+\hline
+RabbitMQ Consumer & Brak & Asynchroniczne, brak timeout \\
+\hline
+\end{longtable}
+
+\section{Konfiguracja RabbitMQ}
+
+\subsection{Queue Configuration}
+
+Wszystkie kolejki są:
+\begin{itemize}
+    \item \textbf{Durable:} false (zgodnie z konfiguracją symulatora)
+    \item \textbf{Exchange Type:} topic
+    \item \textbf{Exchange Name:} Konfigurowalne przez \texttt{RABBITMQ\_EXCHANGE} (domyślnie: \texttt{fire-simulation-exchange})
+\end{itemize}
+
+\subsection{Connection Settings}
+
+\begin{itemize}
+    \item \textbf{Host:} Konfigurowalne przez \texttt{RABBITMQ\_HOST} (domyślnie: \texttt{localhost})
+    \item \textbf{Port:} Konfigurowalne przez \texttt{RABBITMQ\_PORT} (domyślnie: \texttt{5672})
+    \item \textbf{Username:} Konfigurowalne przez \texttt{RABBITMQ\_USER}
+    \item \textbf{Password:} Konfigurowalne przez \texttt{RABBITMQ\_PASS}
+\end{itemize}
+
+\section{Przyszłe ulepszenia}
+
+\subsection{Planowane optymalizacje}
+
+\begin{itemize}
+    \item \textbf{Partial Sector Updates:} Wysyłanie tylko zmienionych pól (fireLevel, burnLevel, etc.) zamiast pełnego sektora
+    \item \textbf{Compression:} Kompresja dużych wiadomości
+    \item \textbf{Batching:} Grupowanie wielu małych aktualizacji w pojedynczą wiadomość
+    \item \textbf{ConcurrentHashMap:} Zastąpienie bloków synchronized kolekcjami współbieżnymi
+    \item \textbf{Backpressure:} Implementacja właściwej obsługi backpressure dla wysokich wskaźników wiadomości
+\end{itemize}
+
+\section{Tabele referencyjne}
+
+\subsection{Stany agentów}
+
+\begin{longtable}{|l|l|}
+\hline
+\textbf{Agent Type} & \textbf{States} \\
+\hline
+FireBrigade & AVAILABLE, TRAVELLING, EXTINGUISHING, IDLE \\
+\hline
+ForesterPatrol & AVAILABLE, TRAVELLING, PATROLLING \\
+\hline
+\end{longtable}
+
+\subsection{Stany sektorów}
+
+\begin{longtable}{|l|}
+\hline
+\textbf{FireState} \\
+\hline
+INACTIVE \\
+\hline
+ACTIVE \\
+\hline
+LOST \\
+\hline
+\end{longtable}
+
+\subsection{Typy sektorów}
+
+\begin{longtable}{|l|}
+\hline
+\textbf{SectorType} \\
+\hline
+FOREST \\
+\hline
+GRASS \\
+\hline
+WATER \\
+\hline
+BUILDING \\
+\hline
+\end{longtable}
+
+\subsection{Typy czujników}
+
+\begin{longtable}{|l|}
+\hline
+\textbf{SensorType} \\
+\hline
+TEMP\_AND\_AIR\_HUMIDITY \\
+\hline
+WIND\_SPEED \\
+\hline
+WIND\_DIRECTION \\
+\hline
+LITTER\_MOISTURE \\
+\hline
+CO2 \\
+\hline
+PM2\_5 \\
+\hline
+CAMERA \\
+\hline
+\end{longtable}
+

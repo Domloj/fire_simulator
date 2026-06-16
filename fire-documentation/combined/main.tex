@@ -1,0 +1,49 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{longtable}
+\usepackage{caption}
+
+\geometry{margin=2.5cm}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    language=Python
+}
+
+\title{System ForestFire \\ \large Dokumentacja techniczna}
+\author{Fire Simulation System}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\chapter{System Overview \& Architecture}
+\input{sections/01-system-overview}
+
+\chapter{Module \& Interface Reference}
+\input{sections/02-modules-and-interfaces}
+
+\chapter{Domain Logic \& Decision Engine}
+\input{sections/03-domain-logic}
+
+\chapter{User Manual}
+\input{sections/04-user-manual}
+
+\end{document}

@@ -1,0 +1,270 @@
+
+% \tableofcontents
+
+\section{Wprowadzenie}
+
+Wszystkie dane są generowane przez symulator, nie pochodzą z rzeczywistych czujników. System dostępny jest przez przeglądarkę pod adresem \texttt{http://localhost:8080}.
+
+\section{Podstawowe funkcje}
+
+\begin{itemize}
+    \item Uruchamianie symulacji pożaru na mapie
+    \item Sterowanie brygadami i patrolami
+    \item Otrzymywanie rekomendacji AI
+    \item Analiza danych z czujników
+\end{itemize}
+
+\section{Interfejs}
+
+\begin{itemize}
+    \item Mapa: pokazuje sektory, brygady, patrole, czujniki
+    \item Panel boczny: info o sektorze, rekomendacje, sterowanie
+    \item Przycisk "Uruchom symulację", "Zatrzymaj", "Załaduj konfigurację"
+\end{itemize}
+
+\subsection{Panele boczne}
+
+\subsubsection{Panel informacyjny sektora}
+
+Wyświetla się po kliknięciu na sektor:
+
+\begin{itemize}
+    \item \textbf{ID sektora}
+    \item \textbf{Typ sektora:} FOREST, GRASS, WATER, BUILDING
+    \item \textbf{Stan ognia:} INACTIVE, ACTIVE, LOST
+    \item \textbf{Poziom ognia:} 0-100
+    \item \textbf{Poziom spalenia:} 0-100\%
+    \item \textbf{Poziom gaszenia:} 0-100\%
+    \item \textbf{Przypisane brygady:} Lista ID brygad
+    \item \textbf{Dane z czujników:} Temperatura, wilgotność, wiatr, CO2, PM2.5
+\end{itemize}
+
+\subsubsection{Panel rekomendacji}
+
+Wyświetla rekomendacje systemu:
+
+\begin{itemize}
+    \item Lista rekomendowanych akcji
+    \item Dla każdej rekomendacji: ID brygady, ID sektora, priorytet
+    \item Przycisk "Zaakceptuj" dla każdej rekomendacji
+\end{itemize}
+
+\subsubsection{Panel sterowania}
+
+Zawiera przyciski do zarządzania symulacją:
+
+\begin{itemize}
+    \item \textbf{Uruchom symulację:} Start nowej symulacji
+    \item \textbf{Zatrzymaj symulację:} Stop bieżącej symulacji
+\end{itemize}
+
+\subsection{Warstwy danych}
+
+\subsubsection{Warstwa sektorów}
+
+Wyświetla wszystkie sektory lasu z ich stanami. Można włączyć/wyłączyć przez menu warstw.
+
+\subsubsection{Warstwa brygad}
+
+Wyświetla pozycje i stany brygad pożarniczych. Można filtrować po stanie (dostępne, w drodze, gaszące).
+
+\subsubsection{Warstwa patroli}
+
+Wyświetla pozycje i stany patroli leśnych. Można filtrować po stanie.
+
+\subsubsection{Warstwa czujników}
+
+Wyświetla lokalizacje czujników. Kliknięcie na czujnik wyświetla jego dane.
+
+\subsubsection{Warstwa rekomendacji}
+
+Wyświetla wizualizację rekomendacji na mapie (strzałki od brygad do sektorów docelowych).
+
+\section{Najczęstsze problemy}
+
+\begin{itemize}
+    \item Brak czujników: nie wszystkie konfiguracje je mają
+    \item Brak brygad: poczekaj aż się zwolnią
+    \item Brak reakcji: sprawdź czy symulacja jest uruchomiona, odśwież stronę
+    \item Brak rekomendacji: poczekaj, sprawdź czy są aktywne pożary
+    \item Mapa nie ładuje się: sprawdź konfigurację i połączenie z backendem
+\end{itemize}
+
+\section{Ograniczenia}
+
+\begin{itemize}
+    \item System nie posiada alertów w czasie rzeczywistym
+    \item Wszystkie dane są generowane przez symulator
+    \item Jednostki i pożary są wirtualne
+    \item System może działać wolniej przy dużych konfiguracjach
+    \item Rekomendacje AI są tylko sugestiami
+\end{itemize}
+
+\section{Porady}
+
+\begin{itemize}
+    \item Monitoruj wiele sektorów
+    \item Używaj rekomendacji jako wskazówek
+    \item Przypisuj brygady do różnych pożarów
+    \item Wysyłaj patrole do sąsiednich sektorów
+\end{itemize}
+
+\section{Podsumowanie}
+
+System jest symulacją do nauki i testowania strategii. Dane są generowane przez symulator, a rekomendacje AI są tylko sugestiami. Użytkownik decyduje o działaniach.
+
+\section{Konfiguracja zaawansowana (LLM)}
+
+\subsection{Przegląd}
+
+System wspiera integrację z Large Language Model (LLM) do generowania rekomendacji i podejmowania decyzji przez agentów. Ta funkcjonalność jest \textbf{opcjonalna} i wymaga konfiguracji.
+
+\subsection{Jak włączyć LLM}
+
+W module \texttt{fire-support} znajdź plik \texttt{.local.env} i zmień następujące linie:
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+# Zamiast:
+#LLM_ENABLED=true
+#ENABLE_LLM_COORDINATION=true
+#ENABLE_AGENT_COMMUNICATION=true
+
+# Ustaw:
+LLM_ENABLED=true
+ENABLE_LLM_COORDINATION=true
+ENABLE_AGENT_COMMUNICATION=true
+\end{lstlisting}
+
+Wybierz model OpenAI (domyślnie: \texttt{gpt-4o-mini}):
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+OPENAI_MODEL=gpt-4o-mini
+# Alternatywy: gpt-4, gpt-4-turbo
+\end{lstlisting}
+
+Wybierz tryb generowania rekomendacji i decyzji agentów:
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+RECOMMENDATION_MODE=llm      # llm, mcts, hybrid
+AGENT_DECISION_MODE=llm      # llm, heuristic, hybrid
+\end{lstlisting}
+
+Uruchom ponownie moduł \texttt{fire-support}:
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+docker compose restart fire-support-service
+\end{lstlisting}
+
+\subsection{Przykładowe konfiguracje}
+
+\subsubsection{Konfiguracja 1: Bez LLM (domyślna)}
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+RECOMMENDATION_MODE=mcts
+AGENT_DECISION_MODE=heuristic
+LLM_ENABLED=false
+\end{lstlisting}
+
+\textbf{Efekt:} System używa tylko algorytmu MCTS (szybko, < 100ms).
+
+\subsubsection{Konfiguracja 2: Pełna integracja LLM}
+
+\begin{lstlisting}[language=bash, basicstyle=\small]
+OPENAI_MODEL=gpt-4o-mini
+RECOMMENDATION_MODE=llm
+AGENT_DECISION_MODE=llm
+LLM_ENABLED=true
+ENABLE_LLM_COORDINATION=true
+ENABLE_AGENT_COMMUNICATION=true
+\end{lstlisting}
+
+\textbf{Efekt:} Wszystko kontrolowane przez LLM (wolniejsze, 1-3s na decyzję).
+
+\subsubsection{Problem 1: Błąd API OpenAI}
+
+\textbf{Objawy:}
+\begin{itemize}
+    \item Rekomendacje nie pojawiają się
+    \item Błąd w logach: \texttt{OpenAI API error}
+\end{itemize}
+
+\textbf{Przyczyna:} Brak klucza API lub nieprawidłowy klucz.
+
+\textbf{Rozwiązanie:}
+\begin{enumerate}
+    \item Sprawdź czy masz klucz API OpenAI
+    \item Dodaj klucz do pliku \texttt{.local.env}: \texttt{OPENAI\_API\_KEY=sk-...}
+    \item Restart serwisu: \texttt{docker compose restart fire-support-service}
+\end{enumerate}
+
+\subsubsection{Problem 2: LLM jest wolny}
+
+\textbf{Objawy:}
+\begin{itemize}
+    \item Rekomendacje pojawiają się po 3-5 sekundach
+    \item System wydaje się ``zawieszać''
+\end{itemize}
+
+\textbf{Przyczyna:} API OpenAI jest wolne lub model jest zbyt duży.
+
+\textbf{Rozwiązanie:}
+\begin{enumerate}
+    \item Użyj mniejszego modelu: \texttt{OPENAI\_MODEL=gpt-4o-mini}
+\end{enumerate}
+
+\subsubsection{Problem 3: Rekomendacje LLM są dziwne}
+
+\textbf{Objawy:}
+\begin{itemize}
+    \item LLM sugeruje nielogiczne akcje
+    \item Brygady są wysyłane w złe miejsca
+\end{itemize}
+
+\textbf{Przyczyna:} LLM nie rozumie kontekstu symulacji lub model jest za mały.
+
+\textbf{Rozwiązanie:}
+\begin{enumerate}
+    \item Użyj większego modelu: \texttt{OPENAI\_MODEL=gpt-4}
+    \item Przełącz na tryb hybrydowy: \texttt{RECOMMENDATION\_MODE=hybrid}
+    \item Wyłącz LLM i użyj MCTS: \texttt{LLM\_ENABLED=false}
+\end{enumerate}
+
+\textbf{Gdy coś nie działa:}
+
+\begin{enumerate}
+    \item \textbf{Sprawdź logi:} \texttt{logs/fire-support/application.log}
+    \item \textbf{Sprawdź status serwisu:} \texttt{docker compose ps}
+\end{enumerate}
+
+\subsubsection{Dlaczego brygady nie reagują na komendy?}
+
+\textbf{Przyczyny:}
+\begin{itemize}
+    \item Symulacja jest zatrzymana
+    \item Błąd komunikacji z backendem
+\end{itemize}
+
+\subsection{Gdzie szukać logów}
+
+\textbf{Logi systemowe:}
+\begin{itemize}
+    \item \texttt{logs/fire-backend/application.log}
+    \item \texttt{logs/fire-simulation/application.log}
+    \item \texttt{logs/fire-support/application.log}
+    \item \texttt{logs/fire-configuration/application.log}
+\end{itemize}
+
+\textbf{Logi Docker:}
+\begin{lstlisting}[language=bash, basicstyle=\small]
+docker compose logs fire-backend-service
+docker compose logs fire-simulation-service
+docker compose logs fire-support-service
+\end{lstlisting}
+
+\textbf{Logi przeglądarki:}
+\begin{enumerate}
+    \item Otwórz konsolę (F12)
+    \item Zakładka ``Console''
+    \item Zakładka ``Network'' (sprawdź błędy HTTP)
+\end{enumerate}
+
