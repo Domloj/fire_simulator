@@ -366,11 +366,14 @@ export default function AgentMarkerManager() {
 
           // reuse previously computed markerDiameterPx
 
-          el.style.width = `${markerDiameterPx}px`;
-          el.style.height = `${markerDiameterPx}px`;
-          // Brygada = kwadrat, patrol = kółko. Kształt od razu mówi typ jednostki.
+          // Brygada = ostry kwadrat, wyraźnie większy; patrol = kółko. Kształt
+          // i rozmiar od razu odróżniają typ jednostki, nawet przy małych
+          // ikonach (2px zaokrąglenia na 9px markerze robilo z kwadratu kółko).
           const isBrigade = unitType === 'fireBrigade';
-          el.style.borderRadius = isBrigade ? '2px' : '50%';
+          const markerSizePx = isBrigade ? markerDiameterPx + 4 : markerDiameterPx;
+          el.style.width = `${markerSizePx}px`;
+          el.style.height = `${markerSizePx}px`;
+          el.style.borderRadius = isBrigade ? '0' : '50%';
           // Brygada ma ciemną obwódkę, żeby biały (wolny) kwadrat miał kontur;
           // patrol zostaje przy białej.
           el.style.border = isBrigade ? '2px solid #1a1a1a' : '2px solid white';
