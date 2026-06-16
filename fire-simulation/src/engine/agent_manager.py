@@ -20,7 +20,7 @@ import copy
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.engine.models.sector import Sector, SectorState
@@ -63,6 +63,12 @@ class AgentConfig:
     # wypalania sektora (~23 ticki), więc pojedyncza reakcja ma sens. Przy 0.05
     # brygada zawsze przegrywała z wypalaniem (20 ticków > 18).
     extinguish_rate: float = 0.10  # przyrost extinguishLevel na brygadę na krok
+
+    # Proaktywne patrolowanie: leśnicy sami objeżdżają teren, nie czekając na
+    # rozkaz z supportu. Bez tego detekcja zależy wyłącznie od czujników i pożar
+    # bywa wykryty z dużym opóźnieniem.
+    proactive_patrol: bool = True
+    patrol_dwell: int = 2          # [ticki] postój w sektorze zanim leśnik ruszy dalej
 
 
 # ─── Lokalizacja ──────────────────────────────────────────────────────────────
@@ -256,6 +262,14 @@ class AgentManager:
         self.brigades:  Dict[int, FireBrigade]    = brigades  or {}
         self.config = config or AgentConfig()
 
+        # Stan proaktywnego patrolowania: kiedy ostatnio każdy sektor był
+        # obserwowany przez patrol oraz ile ticków dany leśnik stoi w sektorze.
+        self._sector_last_patrolled: Dict[int, int] = {}
+        self._patrol_dwell: Dict[int, int] = {}
+        # Leśnicy aktualnie patrolujący autonomicznie. Rozkaz z supportu odbiera
+        # leśnika z tego zbioru, więc roaming nie nadpisuje decyzji supportu.
+        self._autonomous_patrol: set = set()
+
     # ------------------------------------------------------------------
     # Inicjalizacja agentów z konfiguracji mapy
     # ------------------------------------------------------------------
@@ -313,7 +327,110 @@ class AgentManager:
         # 3. Efekt gaszenia
         events += self._apply_extinguishing(next_sectors, current_tick)
 
+        # 4. Proaktywne patrolowanie — leśnicy sami objeżdżają sektory, dzięki
+        #    czemu wykrywają pożar wcześnie, nie czekając na rozkaz z supportu.
+        if self.config.proactive_patrol:
+            events += self._assign_proactive_patrols(next_sectors, current_tick)
+
         return events
+
+    def _assign_proactive_patrols(self,
+                                  next_sectors: Dict[int, "Sector"],
+                                  current_tick: int) -> List[AgentEvent]:
+        """
+        Autonomiczne patrolowanie leśników.
+
+        Bezczynny leśnik (AVAILABLE) dostaje cel, a patrolujący po kilku tickach
+        rusza dalej, żeby pokrywać teren zamiast tkwić w jednym sektorze. Cel to
+        sektor najdawniej obserwowany przez patrol, więc patrole rozchodzą się po
+        mapie i wykrywają pożar zanim ten dorośnie do czujnika.
+        """
+        events: List[AgentEvent] = []
+
+        # Odśwież czas obserwacji sektorów aktualnie patrolowanych i licz postój.
+        for forester in self.foresters.values():
+            if (forester.state == AgentState.PATROLLING
+                    and forester.current_sector_id is not None):
+                self._sector_last_patrolled[forester.current_sector_id] = current_tick
+                self._patrol_dwell[forester.agent_id] = (
+                    self._patrol_dwell.get(forester.agent_id, 0) + 1
+                )
+            else:
+                self._patrol_dwell[forester.agent_id] = 0
+
+        # Sektory zajęte przez innych leśników (cel albo aktualnie patrolowany) —
+        # nie chcemy, by kilku zbiegło się na ten sam.
+        occupied: set = set()
+        for f in self.foresters.values():
+            if f.target_sector_id is not None:
+                occupied.add(f.target_sector_id)
+            if f.state == AgentState.PATROLLING and f.current_sector_id is not None:
+                occupied.add(f.current_sector_id)
+
+        for forester in self.foresters.values():
+            idle = forester.state == AgentState.AVAILABLE
+            # Re-roaming tylko dla leśników, których support nie przejął.
+            done_dwelling = (
+                forester.state == AgentState.PATROLLING
+                and forester.agent_id in self._autonomous_patrol
+                and self._patrol_dwell.get(forester.agent_id, 0) >= self.config.patrol_dwell
+            )
+            if not (idle or done_dwelling):
+                continue
+
+            target_id = self._pick_patrol_target(forester, next_sectors, occupied)
+            if target_id is None:
+                continue
+
+            sector = next_sectors[target_id]
+            forester.state = AgentState.TRAVELLING
+            forester.current_action = AgentAction.PATROL
+            forester.travel_origin = forester.get_current_location()
+            forester.target_sector_id = target_id
+            forester.target_location = Location(lon=sector.longitude, lat=sector.latitude)
+            forester.travel_ticks_total = self.config.travel_time
+            forester.travel_ticks_remaining = self.config.travel_time
+            forester.current_sector_id = None
+            self._patrol_dwell[forester.agent_id] = 0
+            self._autonomous_patrol.add(forester.agent_id)
+            occupied.add(target_id)  # kolejny leśnik w tym ticku już go nie wybierze
+            events.append(AgentEvent(
+                tick=current_tick,
+                event_type=AgentEventType.FORESTER_DISPATCHED,
+                agent_id=forester.agent_id,
+                sector_id=target_id,
+                detail="proactive patrol",
+            ))
+        return events
+
+    def _pick_patrol_target(self,
+                            forester: "ForesterPatrol",
+                            next_sectors: Dict[int, "Sector"],
+                            occupied: set) -> Optional[int]:
+        """
+        Wybiera sektor do patrolowania: najdawniej obserwowany (nigdy = najstarszy),
+        palny, nie płonący i nie zajęty przez innego leśnika. Remis rozstrzyga
+        bliskość do leśnika, żeby skrócić dojazd.
+        """
+        here = forester.get_current_location()
+        best_id: Optional[int] = None
+        best_key: Optional[Tuple[int, float]] = None
+
+        for sid, sector in next_sectors.items():
+            if sid in occupied:
+                continue
+            if sector.longitude is None or sector.latitude is None:
+                continue
+            if not sector.is_flammable():   # DORMANT, ma paliwo, nie woda
+                continue
+            last = self._sector_last_patrolled.get(sid, -1)   # nigdy widziany = -1
+            dist = here.distance_to(Location(lon=sector.longitude, lat=sector.latitude))
+            key = (last, dist)              # najpierw najstarszy, potem najbliższy
+            if best_key is None or key < best_key:
+                best_key = key
+                best_id = sid
+
+        return best_id
 
     def _auto_withdraw_foresters(self,
                                   next_sectors: Dict[int, "Sector"],
@@ -512,6 +629,10 @@ class AgentManager:
                 "INVALID_ACTION_FOR_AGENT_TYPE",
                 f"Nieznana akcja '{action}' dla ForesterPatrol"
             )
+
+        # Support/operator przejmuje sterowanie tym leśnikiem — autonomiczny
+        # patrol przestaje go ruszać, dopóki nie wróci do bazy.
+        self._autonomous_patrol.discard(forester_id)
 
         location_raw = order.get("location")
         if location_raw is None:
