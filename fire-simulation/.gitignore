@@ -1,7 +1,6 @@
 __pycache__/
 */__pycache__/
 **/__pycache__/
-.env 
 fire-simulation.egg-info/
 .pytest_cache/
 logs/application.log

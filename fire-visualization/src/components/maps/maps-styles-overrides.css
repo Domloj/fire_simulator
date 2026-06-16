@@ -1,0 +1,36 @@
+.gm-style iframe + div {
+  border: none !important;  
+}
+
+.gm-style{
+  font-size: 20px;
+}
+
+/* Ensure MapLibre GL map container is properly positioned */
+.maplibregl-map {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+.maplibregl-canvas-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Override MapLibre canvas absolute positioning - ensure it's relative to its container */
+.maplibregl-canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+  /* Ensure canvas is positioned relative to .maplibregl-map, not viewport */
+  margin: 0 !important;
+}

@@ -1,0 +1,38 @@
+.main-card {
+  border-radius: 0px ;
+}
+
+.main-card-header {
+  padding: 20px;
+}
+
+.main-card-header .MuiCardHeader-action {
+  margin: 0 auto;
+  align-self: center;
+}
+
+.main-card-content {
+  /* Content styles handled by MUI CardContent */
+}
+
+.main-card-pre {
+  margin: 0;
+  padding: 16px !important;
+}
+
+.main-card-highlighter {
+  position: relative;
+}
+
+.main-card-highlighter-actions {
+  justify-content: flex-end;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.main-card-highlighter-buttons {
+  display: flex;
+  position: inherit;
+  right: 0;
+  top: 6px;
+}

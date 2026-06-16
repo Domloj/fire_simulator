@@ -1,0 +1,50 @@
+.icon-sidebar {
+  width: 45px;
+  position: fixed;
+  top: 64px;
+  bottom: 48px;
+  left: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: #FAFAFB;
+  z-index: 1200;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  margin-top: 3px;
+}
+
+.icon-sidebar-list {
+  padding-top: 8px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.icon-sidebar-button {
+  min-height: 48px;
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 4px solid rgba(0, 0, 0, 0.12);
+}
+
+.icon-sidebar-icon {
+  min-width: 0;
+  justify-content: center;
+}
+
+.drawer-content-container {
+  height: 100%;
+  width: 100%;
+  background-color: #FAFAFB;
+}
+
+.drawer-content-scroll {
+  height: 100%;
+  background-color: #FAFAFB;
+}
+
+.drawer-content-scroll .simplebar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}

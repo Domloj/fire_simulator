@@ -1,0 +1,67 @@
+*** Begin Patch
+*** Update File: node_modules/@deck.gl/google-maps/dist/utils.js
+@@
+-function getMapSize(map) {
+-    // The map fills the container div unless it's in fullscreen mode
+-    // at which point the first child of the container is promoted
+-    const container = map.getDiv().firstChild;
+-    return {
+-        // @ts-ignore (TS2531) Object is possibly 'null'
+-        width: container.offsetWidth,
+-        // @ts-ignore (TS2531) Object is possibly 'null'
+-        height: container.offsetHeight
+-    };
+-}
++function getMapSize(map) {
++    // The map fills the container div unless it's in fullscreen mode
++    // at which point the first child of the container is promoted
++    // Be defensive: map.getDiv may be unavailable during lifecycle transitions
++    const div = typeof map.getDiv === 'function' ? map.getDiv() : null;
++    const container = div ? div.firstChild : null;
++    return {
++        // Fall back to zeros if container isn't ready yet
++        width: (container && container.offsetWidth) || 0,
++        height: (container && container.offsetHeight) || 0
++    };
++}
+*** End Patch
+*** Begin Patch
+*** Update File: node_modules/@deck.gl/google-maps/dist/index.cjs
+@@
+-function getMapSize(map) {
+-  const container = map.getDiv().firstChild;
+-  return {
+-    width: container.offsetWidth,
+-    height: container.offsetHeight
+-  };
+-}
++function getMapSize(map) {
++  // Be defensive: map.getDiv may return undefined during some lifecycle events
++  const div = typeof map.getDiv === 'function' ? map.getDiv() : null;
++  const container = div ? div.firstChild : null;
++  return {
++    width: (container && container.offsetWidth) || 0,
++    height: (container && container.offsetHeight) || 0
++  };
++}
+*** End Patch
+*** Begin Patch
+*** Update File: node_modules/@deck.gl/google-maps/dist/dist.dev.js
+@@
+-  function getMapSize(map) {
+-    const container = map.getDiv().firstChild;
+-    return {
+-      width: container.offsetWidth,
+-      height: container.offsetHeight
+-    };
+-  }
++  function getMapSize(map) {
++    // Be defensive: map.getDiv may return undefined during some lifecycle events
++    var div = typeof map.getDiv === 'function' ? map.getDiv() : null;
++    var container = div ? div.firstChild : null;
++    return {
++      width: (container && container.offsetWidth) || 0,
++      height: (container && container.offsetHeight) || 0
++    };
++  }
+*** End Patch

@@ -1,0 +1,10 @@
+data
+__pycache__/
+Pipfile
+Pipfile.lock
+pytest_cache/
+logs/application.log
+.pytest_cache/
+.mvn
+mvnw 
+mvnw.cmd 
