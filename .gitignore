@@ -1,7 +1,10 @@
-
-fire-backend/** 
-fire-configurations/**
-fire-visualization/** 
+# Artefakty builda serwisów (źródła zostają w repo, build nie)
+fire-backend/target/
+fire-visualization/node_modules/
+fire-visualization/dist/
+fire-visualization/build/
+fire-configurations/__pycache__/
+fire-configurations/**/__pycache__/
 
 # Python build/cache (OK for fire-simulation source)
 fire-simulation/__pycache__/
@@ -12,7 +15,8 @@ fire-simulation/*.egg-info/
 fire-simulation/**/*.egg-info/
 fire-simulation/target/
 
-.env
-.env.*
 .firevenv
-!.env.example
+
+# Dokumentacja (utrzymywana zewnętrznie, np. Overleaf)
+fire-documentation/
+new-documentation/

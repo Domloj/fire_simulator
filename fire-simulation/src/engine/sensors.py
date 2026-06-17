@@ -31,13 +31,14 @@ class SensorType(Enum):
 @dataclass
 class SensorReading:
     """Single sensor reading (spec 5.2.2 base structure)."""
-    
+
     sensor_id: int
     sensor_type: SensorType
     location: Dict[str, float]  # {lon, lat}
     data: Dict[str, Any]       # Type-specific
     timestamp: str             # ISO format
-    
+    sector_id: Optional[int] = None  # sektor, na którym stoi sensor (do wykrywania)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
@@ -46,6 +47,7 @@ class SensorReading:
             "location": self.location,
             "data": self.data,
             "timestamp": self.timestamp,
+            "sectorId": self.sector_id,
         }
 
 
@@ -69,11 +71,21 @@ class SensorConfig:
 class SensorArray:
     """
     Sensor array for entire forest map.
-    
+
     Manages all sensors, generates deterministic readings per tick.
     """
-    
-    def __init__(self, 
+
+    # Wpływ pożaru na odczyty (przy fire_level=1.0). Bez tego sensory dawały
+    # tylko szum wokół baseline i nie reagowały na ogień, przez co cała
+    # warstwa sensoryczna była dekoracyjna. Wartości dobrane tak, by płonący
+    # sektor wyraźnie przebijał progi wykrywania w silniku.
+    FIRE_CO2_PPM = 3000.0          # ppm dodane do CO2
+    FIRE_PM25 = 450.0              # µg/m³ dodane do PM2.5
+    FIRE_TEMP_C = 45.0             # °C dodane do temperatury
+    FIRE_HUMIDITY_DROP = 0.35      # spadek wilgotności powietrza
+    FIRE_MOISTURE_DROP = 0.25      # spadek wilgotności ściółki
+
+    def __init__(self,
                  rng: RngManager,
                  sensors_config: Optional[Dict[int, SensorConfig]] = None):
         """
@@ -107,26 +119,31 @@ class SensorArray:
             location=location,
         )
     
-    def read_all(self, 
+    def read_all(self,
                  timestamp: str,
                  wind_speed: float = 0.0,
                  wind_direction: float = 0.0,
-                 global_temperature: float = 20.0) -> List[SensorReading]:
+                 global_temperature: float = 20.0,
+                 sector_fire_levels: Optional[Dict[int, float]] = None) -> List[SensorReading]:
         """
         Read all sensors (full sensor sweep for tick).
-        
+
         Args:
             timestamp: ISO timestamp
             wind_speed: Global wind speed (km/h)
             wind_direction: Global wind direction (degrees)
             global_temperature: Global temperature (°C)
-        
+            sector_fire_levels: mapa sector_id -> fire_level (0-1); odczyty na
+                płonących sektorach rosną proporcjonalnie do poziomu ognia
+
         Returns:
             List of sensor readings
         """
+        sector_fire_levels = sector_fire_levels or {}
         readings = []
-        
+
         for sensor_config in self.sensors.values():
+            fire_level = sector_fire_levels.get(sensor_config.sector_id, 0.0)
             for sensor_type in sensor_config.enabled_types:
                 reading = self._read_sensor(
                     sensor_config=sensor_config,
@@ -135,10 +152,11 @@ class SensorArray:
                     wind_speed=wind_speed,
                     wind_direction=wind_direction,
                     global_temperature=global_temperature,
+                    fire_level=fire_level,
                 )
                 if reading:
                     readings.append(reading)
-        
+
         return readings
     
     def _read_sensor(self,
@@ -147,10 +165,11 @@ class SensorArray:
                      timestamp: str,
                      wind_speed: float,
                      wind_direction: float,
-                     global_temperature: float) -> Optional[SensorReading]:
+                     global_temperature: float,
+                     fire_level: float = 0.0) -> Optional[SensorReading]:
         """
         Generate single sensor reading with realistic variation.
-        
+
         Args:
             sensor_config: Sensor configuration
             sensor_type: Type of sensor to read
@@ -158,77 +177,86 @@ class SensorArray:
             wind_speed: Current wind speed
             wind_direction: Current wind direction
             global_temperature: Current global temperature
-        
+            fire_level: poziom ognia (0-1) na sektorze sensora; podbija odczyty
+                gazów/temperatury/dymu, dzięki czemu pożar da się wykryć
+
         Returns:
             SensorReading or None if error
         """
         try:
+            # zaklamrowany poziom ognia (sektor mógł chwilowo wyjść poza 0-1)
+            fire = max(0.0, min(1.0, fire_level))
+
             if sensor_type == SensorType.WIND_SPEED:
                 # Add local variation (±5%)
                 noise = self.rng.normal(0, wind_speed * 0.05)
                 speed = max(0, wind_speed + noise)
                 data = {"speed": round(speed, 2)}
-            
+
             elif sensor_type == SensorType.WIND_DIRECTION:
                 # Add local variation (±10 degrees)
                 noise = self.rng.normal(0, 10)
                 angle = (wind_direction + noise) % 360
                 data = {"angle": round(angle, 1)}
-            
+
             elif sensor_type == SensorType.TEMP_HUMIDITY:
-                # Temperature: ±3°C variation
+                # Temperature: ±3°C variation + ciepło pożaru
                 temp_noise = self.rng.normal(0, 3)
-                temperature = global_temperature + temp_noise
-                
-                # Humidity: ±10% variation
+                temperature = global_temperature + temp_noise + fire * self.FIRE_TEMP_C
+
+                # Humidity: ±10% variation, pożar osusza powietrze
                 humidity_noise = self.rng.normal(0, 0.1)
-                humidity = max(0, min(1.0, sensor_config.baseline_humidity + humidity_noise))
-                
+                humidity = sensor_config.baseline_humidity + humidity_noise - fire * self.FIRE_HUMIDITY_DROP
+                humidity = max(0.0, min(1.0, humidity))
+
                 data = {
                     "temperature": round(temperature, 1),
                     "humidity": round(humidity, 3),
                 }
-            
+
             elif sensor_type == SensorType.LITTER_MOISTURE:
-                # Moisture: ±0.05 variation
+                # Moisture: ±0.05 variation, ogień wysusza ściółkę
                 moisture_noise = self.rng.normal(0, 0.05)
-                moisture = max(0, min(1.0, sensor_config.baseline_moisture + moisture_noise))
+                moisture = sensor_config.baseline_moisture + moisture_noise - fire * self.FIRE_MOISTURE_DROP
+                moisture = max(0.0, min(1.0, moisture))
                 data = {"moisture": round(moisture, 3)}
-            
+
             elif sensor_type == SensorType.CO2:
-                # CO2: ±50 ppm variation
+                # CO2: ±50 ppm variation + emisja ze spalania
                 co2_noise = self.rng.normal(0, 50)
-                concentration = max(0, sensor_config.baseline_co2 + co2_noise)
+                concentration = max(0, sensor_config.baseline_co2 + co2_noise + fire * self.FIRE_CO2_PPM)
                 data = {"concentration": round(concentration, 1)}
-            
+
             elif sensor_type == SensorType.PM2_5:
-                # PM2.5: ±15% variation
+                # PM2.5: ±15% variation + pył ze spalania
                 pm_noise = self.rng.normal(0, sensor_config.baseline_pm25 * 0.15)
-                concentration = max(0, sensor_config.baseline_pm25 + pm_noise)
+                concentration = max(0, sensor_config.baseline_pm25 + pm_noise + fire * self.FIRE_PM25)
                 data = {"concentration": round(concentration, 1)}
-            
+
             elif sensor_type == SensorType.CAMERA:
-                # Camera: smoke detection (probabilistic)
-                # Smoke likelihood increases with fire activity
+                # Camera: smoke detection — szansa rośnie z poziomem ognia
+                # (baseline 5% szumu, przy pełnym pożarze ~95%)
                 smoke_prob = self.rng.random()  # [0, 1)
-                smoke_detected = smoke_prob < 0.1  # 10% baseline detection
-                smoke_level = int(self.rng.uniform(0, 5)) if smoke_detected else 0
-                
+                detect_threshold = min(0.97, 0.05 + 0.9 * fire)
+                smoke_detected = smoke_prob < detect_threshold
+                smoke_level = (1 + int(fire * 4)) if smoke_detected else 0
+
                 data = {
                     "smokeDetected": smoke_detected,
                     "smokeLevel": smoke_level,
-                    "smokeLocation": None,  # TODO: integrate with sector fire state
+                    "smokeLocation": sensor_config.location if smoke_detected else None,
                 }
-            
+
             else:
                 return None
-            
+
             return SensorReading(
                 sensor_id=sensor_config.sensor_id,
                 sensor_type=sensor_type,
                 location=sensor_config.location,
                 data=data,
                 timestamp=timestamp,
+                sector_id=sensor_config.sector_id,
             )
         
         except Exception as e:

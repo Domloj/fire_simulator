@@ -1,0 +1,61 @@
+.main-layout-container {
+  display: flex;
+  width: 100%;
+}
+
+.main-pane {
+  flex-grow: 1;
+  padding: 0;
+  height: calc(100vh - 64px - 48px); /* Navbar (64px) + Footer (48px) */
+  overflow: hidden; /* Prevent scrolling, let content handle it */
+  display: flex;
+  flex-direction: column;
+}
+
+.main-pane-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+@media (min-width: 600px) {
+  .main-pane-content {
+    padding: 24px;
+  }
+}
+
+/* Responsive width calculations */
+@media (min-width: 1200px) {
+  .main-pane-drawer-open {
+    width: calc(100% - 45px - 215px);
+    margin-left: 260px; /* Account for icon sidebar (45px) + drawer (215px) */
+  }
+
+  .main-pane-drawer-closed {
+    width: calc(100% - 45px);
+    margin-left: 45px; /* Account for icon sidebar only */
+  }
+}
+
+@media (max-width: 1199px) {
+  .main-pane-drawer-open,
+  .main-pane-drawer-closed {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+/* Remove padding from main-pane-content when SimulationPage or SettingsPage is inside */
+.main-pane-content > .simulation-page-container,
+.main-pane-content > .settings-page-container {
+  margin: 0;
+}
+
+.main-pane-content:has(.simulation-page-container),
+.main-pane-content:has(.settings-page-container) {
+  padding: 0;
+}
+

@@ -52,6 +52,13 @@ class FirePropagationConfig:
     alpha_wind: float = 0.01          # windAlpha — wind influence coefficient (|w| in km/h)
     beta_temperature: float = 0.02    # betaTemperature — temperature coefficient
 
+    # Globalny współczynnik rozprzestrzeniania. Bez niego, przy moisture=0 i
+    # sąsiedzie palącym się pełnym ogniem, p_ign wychodzi 1.0 — czyli ogień
+    # zajmuje każdego sąsiada deterministycznie i rośnie wykładniczo (cała
+    # siatka w ~20 ticków, nie do opanowania). 0.2 czyni zapłon stochastycznym
+    # i stopniowym, więc straż ma szansę powstrzymać front.
+    spread_probability: float = 0.2
+
     # Reference values
     reference_temperature: float = 20.0  # °C
 
@@ -59,11 +66,13 @@ class FirePropagationConfig:
     ignition_base: float = 0.10       # Initial fireLevel of a newly ignited sector (ℓ₀)
 
     # Fire growth (section 2.4.2 R3)
-    spread_rate: float = 0.1          # Base spread rate per tick
+    # 0.04 rozkłada eskalację równo na stopnie 1-4 (~6 ticków każdy); przy 0.10
+    # sektor przeskakiwał do EXTREME w ~7 ticków i niższe stopnie były niewidoczne.
+    spread_rate: float = 0.04         # Base spread rate per tick
     wind_multiplier_max: float = 2.0  # Max wind effect multiplier
 
     # Fuel consumption (section 2.4.2 R3)
-    # Rates per fire classification level per Klimek ISD2024:
+    # Rates per fire classification level (ISD2024):
     #   level 1 (EARLY_FIRE):   0.5 units/step  → relative multiplier 0.5
     #   level 2 (MEDIUM_FIRE):  1.0 units/step  → baseline multiplier 1.0
     #   level 3 (FULL_FIRE):    2.0 units/step  → multiplier 2.0
@@ -77,7 +86,7 @@ class FirePropagationConfig:
 
     def __post_init__(self):
         if self.fuel_consumption_multiplier is None:
-            # Keys are fire classification levels 1–4 per Klimek ISD2024 Table 1
+            # Keys are fire classification levels 1-4 (ISD2024)
             object.__setattr__(self, 'fuel_consumption_multiplier', {
                 1: 0.5,   # EARLY_FIRE   — manageable by one engine
                 2: 1.0,   # MEDIUM_FIRE  — baseline = fuel_consumption_rate
@@ -195,12 +204,13 @@ class FirePropagation:
         # IMPORTANT: Clamp to prevent negative probability at low temperatures
         temperature_component = max(0.0, temperature_component)
         
-        # Combine all factors
-        p_ignition = (fuel_moisture_factor * 
-                     wind_component * 
-                     neighbor_fire_factor * 
+        # Combine all factors (z globalnym współczynnikiem rozprzestrzeniania)
+        p_ignition = (self.config.spread_probability *
+                     fuel_moisture_factor *
+                     wind_component *
+                     neighbor_fire_factor *
                      temperature_component)
-        
+
         # Clamp to [0, 1]
         return max(0.0, min(1.0, p_ignition))
     

@@ -1,0 +1,44 @@
+*** Begin Patch
+*** Update File: node_modules/@vis.gl/react-google-maps/dist/index.modern.mjs
+@@
+@@
+@@
+-        scriptElement.async = true;
+-        scriptElement.src = MAPS_API_BASE_URL + `?` + urlParams.toString();
+-        scriptElement.nonce = ((_document$querySelect = document.querySelector('script[nonce]')) == null ? void 0 : _document$querySelect.nonce) || '';
++        scriptElement.async = true;
++        scriptElement.src = MAPS_API_BASE_URL + `?` + urlParams.toString();
++        // enable CORS-friendly error reporting when possible
++        // so uncaught errors from the Google Maps script are more informative
++        scriptElement.crossOrigin = 'anonymous';
++        scriptElement.nonce = ((_document$querySelect = document.querySelector('script[nonce]')) == null ? void 0 : _document$querySelect.nonce) || '';
+@@
+-export { APILoadingStatus, APIProvider, APIProviderContext, AdvancedMarker, AdvancedMarkerContext, ControlPosition, GoogleMapsContext, InfoWindow, Map, MapControl, Marker, Pin, isLatLngLiteral, latLngEquals, limitTiltRange, toLatLngLiteral, useAdvancedMarkerRef, useApiIsLoaded, useApiLoadingStatus, useMap, useMapsLibrary, useMarkerRef };
+-//# sourceMappingURL=index.modern.mjs.map
++export { APILoadingStatus, APIProvider, APIProviderContext, AdvancedMarker, AdvancedMarkerContext, ControlPosition, GoogleMapsContext, InfoWindow, Map, MapControl, Marker, Pin, isLatLngLiteral, latLngEquals, limitTiltRange, toLatLngLiteral, useAdvancedMarkerRef, useApiIsLoaded, useApiLoadingStatus, useMap, useMapsLibrary, useMarkerRef };
+*** End Patch
+*** Begin Patch
+*** Update File: node_modules/@vis.gl/react-google-maps/dist/index.umd.js
+@@
+@@
+-          scriptElement.async = true;
+-          scriptElement.src = MAPS_API_BASE_URL + "?" + urlParams.toString();
+-          scriptElement.nonce = ((_document$querySelect = document.querySelector('script[nonce]')) == null ? void 0 : _document$querySelect.nonce) || '';
++          scriptElement.async = true;
++          scriptElement.src = MAPS_API_BASE_URL + "?" + urlParams.toString();
++          // enable CORS-friendly error reporting when possible
++          // so uncaught errors from the Google Maps script are more informative
++          scriptElement.crossOrigin = 'anonymous';
++          scriptElement.nonce = ((_document$querySelect = document.querySelector('script[nonce]')) == null ? void 0 : _document$querySelect.nonce) || '';
+@@
+-  exports.useMap = useMap;
+-  exports.useMapsLibrary = useMapsLibrary;
+-  exports.useMarkerRef = useMarkerRef;
+-
+-}));
++  exports.useMap = useMap;
++  exports.useMapsLibrary = useMapsLibrary;
++  exports.useMarkerRef = useMarkerRef;
++
++}));
+*** End Patch

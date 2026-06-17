@@ -1,0 +1,8 @@
+node_modules
+dist
+
+.env
+package-lock.json
+build
+.DS_Store
+.webpack_cache

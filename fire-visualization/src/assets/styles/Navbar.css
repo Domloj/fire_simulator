@@ -1,0 +1,31 @@
+.navbar-toolbar {
+  justify-content: space-between;
+  min-height: 64px !important;
+}
+
+.navbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar-title-text {
+  font-weight: 600;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-actions-simulation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.navbar-actions-simulation > * {
+  min-width: 190px;
+}

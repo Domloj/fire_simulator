@@ -1,0 +1,34 @@
+.log-tabs-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.log-tabs-tabs {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  min-height: 48px;
+}
+
+.log-tabs-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+}
+
+.log-tabs-stats {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}

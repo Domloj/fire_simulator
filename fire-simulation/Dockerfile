@@ -9,4 +9,4 @@ COPY . /code
 # Ensure log directory exists for log file mount
 RUN mkdir -p /var/log/fire-simulation
 
-CMD ["python", "./main.py"]
+CMD ["python", "./main_new.py"]

@@ -1,0 +1,64 @@
+.app-layout-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.app-layout-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-main-pane {
+  flex-grow: 1;
+  padding: 0;
+  height: '100%'; /* Full height minus navbar (64px) and footer (48px) */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.app-main-pane-content {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(to bottom, #ffffff, #f5f5f5);
+}
+
+/* Responsive width calculations */
+@media (min-width: 1200px) {
+  .app-main-pane-drawer-open {
+    width: calc(100% - 45px - 215px);
+    margin-left: 260px; /* Account for icon sidebar (45px) + drawer (215px) */
+  }
+
+  .app-main-pane-drawer-closed {
+    width: calc(100% - 45px);
+    margin-left: 45px; /* Account for icon sidebar only */
+  }
+}
+
+@media (max-width: 1199px) {
+  .app-main-pane-drawer-open,
+  .app-main-pane-drawer-closed {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+/* Padding for main pane content - removed for map to fill entire space */
+.app-main-pane-content {
+  padding: 0;
+}
+
+/* Ensure Grid items fill full height */
+.app-main-pane-content .MuiGrid-item {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+}

@@ -11,6 +11,7 @@ Publishes telemetry to fire_updates exchange (type: topic) per spec routing keys
 
 import json
 import logging
+import os
 import pika
 from typing import Dict, Any, Optional, List
 from dataclasses import asdict
@@ -30,15 +31,19 @@ class RabbitMQPublisher:
     EXCHANGE_NAME = "fire_updates"
     EXCHANGE_TYPE = "topic"
     
-    def __init__(self, 
-                 host: str = "localhost",
-                 port: int = 5672,
-                 username: str = "guest",
-                 password: str = "guest",
+    def __init__(self,
+                 host: Optional[str] = None,
+                 port: Optional[int] = None,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
                  virtual_host: str = "/"):
         """
         Initialize RabbitMQ connection.
-        
+
+        Wartości domyślne brane są ze zmiennych środowiskowych
+        (RABBITMQ_HOST/PORT/USER/PASS) — w kontenerze brokerem jest host
+        "rabbitmq", nie "localhost". Jawne argumenty mają pierwszeństwo.
+
         Args:
             host: RabbitMQ host
             port: RabbitMQ port
@@ -46,8 +51,10 @@ class RabbitMQPublisher:
             password: Credentials
             virtual_host: RabbitMQ vhost
         """
-        self.host = host
-        self.port = port
+        self.host = host or os.environ.get("RABBITMQ_HOST", "localhost")
+        self.port = int(port or os.environ.get("RABBITMQ_PORT", 5672))
+        username = username or os.environ.get("RABBITMQ_USER", "guest")
+        password = password or os.environ.get("RABBITMQ_PASS", "guest")
         self.virtual_host = virtual_host
         self.connection = None
         self.channel = None
@@ -75,11 +82,12 @@ class RabbitMQPublisher:
             )
             self.channel = self.connection.channel()
             
-            # Declare exchange (idempotent)
+            # Declare exchange (idempotent). durable=False musi zgadzać się z
+            # deklaracją backendu (FFSup), inaczej broker odrzuca redeklarację.
             self.channel.exchange_declare(
                 exchange=self.EXCHANGE_NAME,
                 exchange_type=self.EXCHANGE_TYPE,
-                durable=True
+                durable=False
             )
             
             self.available = True
@@ -282,9 +290,11 @@ class RabbitMQPublisher:
         """
         if not brigades_data:
             return True
-        
-        message = {"brigades": brigades_data}
-        
+
+        # Backend deserializuje to do EvFireBrigadeBatch(List batch) — pole musi
+        # nazywać się "batch", inaczej dostaje null i nie emituje pozycji agentów.
+        message = {"batch": brigades_data}
+
         return self.publish(
             routing_key="simulation.telemetry.agents.fire_brigade_batch",
             message=message
@@ -342,9 +352,10 @@ class RabbitMQPublisher:
         """
         if not foresters_data:
             return True
-        
-        message = {"foresters": foresters_data}
-        
+
+        # Backend oczekuje pola "batch" (EvForesterPatrolBatch(List batch)).
+        message = {"batch": foresters_data}
+
         return self.publish(
             routing_key="simulation.telemetry.agents.forester_batch",
             message=message

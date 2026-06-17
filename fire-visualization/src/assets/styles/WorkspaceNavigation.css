@@ -1,0 +1,31 @@
+.file-system-item {
+  cursor: pointer;
+}
+
+.file-system-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.file-system-item-selected {
+  background-color: rgba(25, 118, 210, 0.08);
+  border-right: 2px solid rgba(0, 0, 0, 0.12);;
+}
+
+.file-system-item-selected:hover {
+  background-color: rgba(25, 118, 210, 0.08);
+}
+
+.file-system-icon {
+  min-width: 36px;
+}
+
+.file-system-icon-folder,
+.file-system-icon-file {
+  font-size: 18px;
+}
+
+.file-system-list-item {
+  padding-left: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}

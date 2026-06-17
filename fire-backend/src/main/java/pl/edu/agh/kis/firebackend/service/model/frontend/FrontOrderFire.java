@@ -1,0 +1,31 @@
+package pl.edu.agh.kis.firebackend.service.model.frontend;
+
+import pl.edu.agh.kis.firebackend.model.primitives.Location;
+
+public class FrontOrderFire extends FrontOrder
+{
+        private int fireBrigadeId;
+
+        public FrontOrderFire(int fireBrigadeId, Location location, boolean isGoToBase)
+        {
+            super(location, isGoToBase);
+            this.fireBrigadeId = fireBrigadeId;
+        }
+            
+        @Override
+        public int getId() 
+        {
+            return fireBrigadeId;
+        }
+
+        @Override
+        public String toString() 
+        {
+            return "FrontOrderFire{" +
+                    "fireBrigadeId=" + fireBrigadeId +
+                    ", location=" + getLocation() +
+                    ", isGoToBase=" + isGoToBase() +
+                    ", source=" + getSource() +
+                    '}';
+        }
+}
