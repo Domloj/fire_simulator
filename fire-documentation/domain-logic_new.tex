@@ -183,12 +183,12 @@ Maps (Sectors) to główna baza danych zawierająca definicje obszarów monitoro
 
 
 
-Sektor może znajdować się w jednym z czterech stanów:
+Sektor może znajdować się w jednym z czterech stanów, które stanowią zarazem symbole alfabetu L-systemu (sekcja~\ref{sec:lsystem}):
 \begin{itemize}
-    \item \textbf{DORMANT} -- sektor nie płonie (gotowy do zapłonu)
-    \item \textbf{BURNING} -- aktywny pożar
-    \item \textbf{EXTINGUISHED} -- pożar ugaszony przez brygadę
-    \item \textbf{ASH} -- sektor wypalony, paliwo wyczerpane (stan nieodwracalny)
+    \item \textbf{DORMANT} (symbol $F$) -- sektor nie płonie (gotowy do zapłonu)
+    \item \textbf{BURNING} (symbol $B$) -- aktywny pożar
+    \item \textbf{EXTINGUISHED} (symbol $E$) -- pożar ugaszony przez brygadę
+    \item \textbf{ASH} (symbol $A$) -- sektor wypalony, paliwo wyczerpane (stan nieodwracalny)
 \end{itemize}
 
 Przejścia między stanami:
@@ -281,6 +281,99 @@ Kamera (dym)         & 5\% szumu    & prawdop. detekcji $\approx 0{,}05 + 0{,}9\
 \end{table}
 
 Wartości dorzutu dobrano tak, aby płonący sektor wyraźnie przebijał progi wykrywania w silniku (CO\textsubscript{2} $> 800$ ppm, PM2.5 $> 100$ µg/m³, temperatura $> 45$ °C), co stanowi podstawę detekcji pożaru przez sieć czujników (sekcja~\ref{sec:detection}).
+
+\section{Formalny model: parametryczny L-system}
+\label{sec:lsystem}
+
+Rozprzestrzenianie się pożaru opisano formalnie jako \textbf{parametryczny, kontekstowy, stochastyczny system Lindenmayera (L-system)}. Jest to zgodne z podejściem proponowanym w pracach R. Klimka, w którym dynamikę zjawiska modeluje się gramatyką przepisującą symbole reprezentujące sektory lasu. Las jest słowem nad alfabetem stanów sektora, a kolejne kroki symulacji odpowiadają krokom derywacji gramatyki.
+
+L-systemy wywodzą się z formalnego opisu wzrostu organizmów (Lindenmayer, 1968; Prusinkiewicz \& Lindenmayer, \textit{The Algorithmic Beauty of Plants}). Ich siłą jest zwięzłe ujęcie złożonej, samopodobnej dynamiki za pomocą niewielkiego zbioru reguł przepisywania stosowanych równolegle. Pożar lasu, propagujący się lokalnie od sektora do sektora, naturalnie wpisuje się w ten formalizm.
+
+\subsection{Wariant L-systemu}
+
+Wykorzystany L-system łączy trzy rozszerzenia klasycznego (bezkontekstowego, deterministycznego) modelu:
+\begin{itemize}
+  \item \textbf{parametryczny} -- każdy symbol niesie wektor parametrów (poziom ognia, paliwo, wilgotność, poziom gaszenia), a reguły operują na tych parametrach;
+  \item \textbf{kontekstowy} (typu IL/2L) -- możliwość przepisania symbolu zależy od jego sąsiadów w siatce: sektor zajmuje się ogniem tylko wtedy, gdy sąsiaduje z płonącym;
+  \item \textbf{stochastyczny} -- reguła zapłonu opatrzona jest prawdopodobieństwem, dzięki czemu front pożaru przesuwa się nieregularnie, odzwierciedlając losowość warunków rzeczywistych.
+\end{itemize}
+
+\subsection{Alfabet}
+
+Stan każdego sektora to jeden z symboli alfabetu $\Sigma = \{F, B, A, E\}$:
+\begin{itemize}
+  \item $F$ (\textit{fuel}) -- sektor z paliwem, jeszcze nie płonie,
+  \item $B$ (\textit{burning}) -- sektor aktywnie płonący,
+  \item $A$ (\textit{ash}) -- sektor wypalony, paliwo wyczerpane; symbol terminalny,
+  \item $E$ (\textit{extinguished}) -- sektor ugaszony przez brygadę; symbol terminalny.
+\end{itemize}
+
+\subsection{Parametry symboli}
+
+Symbole $F$ oraz $B$ są parametryczne; ich moduł niesie:
+\begin{itemize}
+  \item $\ell \in [0,1]$ -- poziom ognia (\texttt{fireLevel}),
+  \item $f \in [0,1]$ -- pozostałe paliwo (\texttt{fuel}),
+  \item $m \in [0,1]$ -- wilgotność (\texttt{moisture}),
+  \item $e \in [0,1]$ -- poziom ugaszenia (\texttt{extinguishLevel}).
+\end{itemize}
+Na produkcje wpływają dodatkowo parametry globalne otoczenia: wektor wiatru $w$ oraz temperatura $T$ (zob. sekcja~\ref{sec:ignition}).
+
+\subsection{Aksjomat}
+
+Aksjomatem (słowem początkowym derywacji) jest konfiguracja mapy z bazy danych: wszystkie sektory w stanie $F$ z parametrami początkowymi, poza wskazanym źródłem pożaru, które startuje w stanie $B(\ell_0)$, gdzie $\ell_0$ to początkowy poziom ognia.
+
+\subsection{Reguły produkcji}
+
+W każdym kroku derywacji do wszystkich symboli stosowane są równolegle poniższe reguły. Zapis $\langle B \rangle\, S$ oznacza produkcję symbolu $S$ w kontekście sąsiada $B$, a symbol nad strzałką to prawdopodobieństwo produkcji.
+
+\paragraph{P1 -- zapłon (stochastyczna, kontekstowa).}
+\begin{equation}
+\langle B \rangle\, F(f,m) \;\xrightarrow{\;p_{ign}\;}\; B(\ell_0)
+\end{equation}
+Sektor $F$ sąsiadujący z co najmniej jednym płonącym sektorem $B$ przechodzi w stan $B$ z prawdopodobieństwem $p_{ign}$, wyznaczanym z paliwa, wilgotności, wiatru i temperatury (sekcja~\ref{sec:ignition}). Z prawdopodobieństwem $1 - p_{ign}$ pozostaje $F$.
+
+\paragraph{P2 -- wzrost ognia (parametryczna).}
+\begin{equation}
+B(\ell, f) \;\rightarrow\; B\Big(\min(\ell + spreadRate\cdot\alpha,\; 1),\;\; f - \mathit{zuzycie}(\ell)\Big)
+\end{equation}
+Płonący sektor zwiększa poziom ognia o przyrost zależny od typu sektora ($\alpha$) i zużywa paliwo w tempie zależnym od stopnia pożaru.
+
+\paragraph{P3 -- wypalenie.}
+\begin{equation}
+B(\cdot, f) \;\rightarrow\; A \qquad \text{gdy } f \le 0
+\end{equation}
+
+\paragraph{P4 -- ugaszenie.}
+\begin{equation}
+B(\cdot, e) \;\rightarrow\; E \qquad \text{gdy } e \ge 1
+\end{equation}
+Parametr $e$ podnoszą brygady gaśnicze obecne w sektorze. Symbole $A$ oraz $E$ są terminalne i nie podlegają dalszym produkcjom.
+
+\subsection{Krok derywacji}
+
+Jeden krok derywacji odpowiada jednemu tickowi symulacji. Przepisanie jest \textbf{równoległe}: produkcje wyznacza się na podstawie niezmiennego stanu z poprzedniego kroku, a ich wynik tworzy stan następny. Dzięki temu derywacja jest deterministyczna przy ustalonym ziarnie generatora liczb losowych -- ten sam aksjomat, te same parametry i ta sama sekwencja losowań dają identyczny przebieg.
+
+\subsection{Przykład derywacji}
+
+Dla fragmentu siatki $F\,B\,F$ (sektor płonący między dwoma z paliwem), gdy $p_{ign}$ jest wysokie dla lewego sąsiada, a niskie dla prawego, jeden krok może dać:
+\begin{equation}
+F\,B\,F \;\Longrightarrow\; B\,B\,F
+\end{equation}
+Lewy sektor zajął się od płonącego sąsiada (reguła P1), środkowy rozwinął ogień (P2), a prawy pozostał $F$, bo losowanie nie przekroczyło progu $p_{ign}$.
+
+\subsection{Odwzorowanie w implementacji}
+
+Reguły produkcji realizują metody silnika \texttt{FirePropagation}:
+\begin{itemize}
+  \item P1 -- \texttt{calculate\_ignition\_probability()} oraz \texttt{attempt\_ignition()},
+  \item P2 -- \texttt{update\_fire\_level()} oraz \texttt{update\_fuel()},
+  \item P3 -- \texttt{check\_burnout()} (przejście do $A$),
+  \item P4 -- \texttt{check\_extinguishment()} (przejście do $E$).
+\end{itemize}
+Symbole $F/B/A/E$ odpowiadają wartościom \texttt{SectorState}: \texttt{DORMANT}, \texttt{BURNING}, \texttt{ASH}, \texttt{EXTINGUISHED}.
+
+Poniższe sekcje rozwijają regułę P1 -- sposób wyznaczania prawdopodobieństwa zapłonu oraz wpływ wiatru i typu sektora.
 
 \section{Rozprzestrzenianie się ognia}
 
@@ -916,7 +1009,7 @@ Struktura modułu \textit{Forest Protection \& Fire Processing} w zakresie obsł
 
 System analizuje dane środowiskowe w sposób cykliczny, w konfigurowalnym interwale czasowym.
 
-Modelowanie rozprzestrzeniania się pożaru opiera się na modelu probabilistycznym: dla każdego płonącego sektora analizowane są sektory sąsiednie, a prawdopodobieństwo zapłonu wyznacza funkcja \texttt{calculate\_ignition\_probability()} uwzględniająca paliwo, wilgotność, wiatr oraz temperaturę (sekcja~\ref{sec:ignition}).
+Modelowanie rozprzestrzeniania się pożaru opiera się na stochastycznym L-systemie (sekcja~\ref{sec:lsystem}): dla każdego płonącego sektora analizowane są sektory sąsiednie, a prawdopodobieństwo zapłonu (reguła produkcji P1) wyznacza funkcja \texttt{calculate\_ignition\_probability()} uwzględniająca paliwo, wilgotność, wiatr oraz temperaturę (sekcja~\ref{sec:ignition}).
 
 Detekcja pożaru nie polega na bezpośrednim odczycie stanu sektora, lecz na danych z sieci czujników. Symulator publikuje pełny stan jedynie tych sektorów, które zostały faktycznie wykryte:
 \begin{itemize}
