@@ -594,11 +594,17 @@ class AgentManager:
         """Odwołuje wszystkie brygady z sektora, który przestał płonąć."""
         for brigade in self.brigades.values():
             if brigade.current_sector_id == sector_id:
+                # Pozycję wyjściową bierzemy ZANIM zmienimy stan i cel. Inaczej
+                # get_current_location() (stan już TRAVELLING, cel = baza, a stare
+                # travel_ticks z remaining=0 dają t=1.0) zwróciłoby od razu bazę,
+                # więc travel_origin = baza i brygada teleportuje się do swojej
+                # bazy zamiast płynnie z niej wracać.
+                origin = brigade.get_current_location()
                 brigade.state = AgentState.TRAVELLING
                 brigade.current_action = AgentAction.GO_TO_BASE
                 brigade.target_sector_id = None
                 brigade.target_location = brigade.base_location.clone()
-                brigade.travel_origin = brigade.get_current_location()
+                brigade.travel_origin = origin
                 brigade.travel_ticks_total = self.config.travel_time
                 brigade.travel_ticks_remaining = self.config.travel_time
                 brigade.current_sector_id = None
