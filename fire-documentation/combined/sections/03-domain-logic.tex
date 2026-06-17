@@ -888,8 +888,8 @@ Modelowanie rozprzestrzeniania się pożaru opiera się na modelu probabilistycz
 
 Detekcja pożaru nie polega na bezpośrednim odczycie stanu sektora, lecz na danych z sieci czujników. Symulator publikuje pełny stan jedynie tych sektorów, które zostały faktycznie wykryte:
 \begin{itemize}
-    \item przez czujnik, którego odczyt przebił próg detekcji (CO\textsubscript{2} $> 800$ ppm, PM2.5 $> 100$ µg/m³, temperatura $> 45$ °C lub kamera wykryła dym), albo
-    \item przez patrol leśników znajdujący się w pobliżu płonącego sektora.
+    \item przez czujnik na tym samym lub sąsiednim sektorze, którego odczyt przebił próg detekcji (CO\textsubscript{2} $> 800$ ppm, PM2.5 $> 100$ µg/m³, temperatura $> 45$ °C lub kamera wykryła dym) -- dym i stężenia gazów rozchodzą się na sektory sąsiednie, więc czujnik nie musi stać dokładnie na płonącym sektorze, albo
+    \item przez patrol leśników stojący na płonącym sektorze lub na sektorze z nim sąsiadującym.
 \end{itemize}
 
 Sektory płonące, lecz jeszcze niewykryte, są maskowane w danych dla modułu wsparcia (publikowane jako \texttt{DORMANT}). Dzięki temu logika decyzyjna reaguje dopiero na potwierdzone wykrycie, a nie na wszechwiedzę o stanie mapy.
@@ -1154,7 +1154,7 @@ Węzeł z najwyższą wartością UCT jest wybierany do ekspansji.
 Po dotarciu do liścia, węzeł jest rozwijany przez wygenerowanie wszystkich możliwych akcji:
 \begin{itemize}
     \item Dla każdej dostępnej brygady pożarniczej: możliwe akcje to przypisanie do sektora z aktywnym pożarem
-    \item Dla patroli leśnych: używana jest heurystyka (zob. sekcja \ref{sec:patrol-heuristic})
+    \item Patrolami leśnymi MCTS nie steruje -- ich ruchem zarządza autonomicznie symulator (zob. sekcja \ref{sec:patrol-heuristic})
 \end{itemize}
 
 \subsection{Faza symulacji (Simulation)}
@@ -1252,23 +1252,21 @@ Symulacja MCTS kończy się, gdy:
 
 \section{Heurystyki decyzyjne}
 
-\subsection{Heurystyka dla patroli leśnych}
+\subsection{Autonomiczne patrolowanie leśników}
 \label{sec:patrol-heuristic}
 
-Patrole leśne używają heurystyki zamiast MCTS do wyboru sektorów do patrolowania:
+Patrolami leśników steruje autonomicznie symulator, a nie moduł wsparcia. Wynika to z zależności typu jajko–kura: support bramkuje wiedzę o pożarze do momentu jego wykrycia (sekcja~\ref{sec:detection}), a wykrycie wymaga m.in. obecności patrolu w pobliżu ognia -- gdyby to support kierował patrolami, nie wysłałby ich tam, gdzie jeszcze nie widzi pożaru. Dlatego rozkazy patrolu przychodzące z modułu wsparcia są w symulatorze ignorowane (gdy autonomiczny patrol jest włączony), a leśnicy objeżdżają teren samodzielnie. Moduł wsparcia koncentruje się na brygadach gaśniczych.
+
+Bezczynny leśnik dostaje cel zgodnie z następującą heurystyką:
 
 \begin{enumerate}
-    \item \textbf{Filtrowanie:} Ignorowane są sektory z aktywnym pożarem (stan \texttt{BURNING})
-    \item \textbf{Priorytetyzacja:} Priorytet mają "starsze" sektory -- te, które nie były patrolowane najdłużej
-    \item \textbf{Wybór:} Każdy patrol wybiera inny sektor (brak duplikatów)
+    \item \textbf{Filtrowanie:} brane są tylko sektory palne, nie płonące i nie zajęte przez innego leśnika (cel lub aktualnie patrolowany).
+    \item \textbf{Priorytet wieku:} najpierw sektory najdawniej obserwowane przez patrol; sektory nigdy nie patrolowane traktowane są jako najstarsze.
+    \item \textbf{Rozpraszanie:} przy równym wieku wybierany jest sektor położony jak najdalej od pozostałych patroli, żeby leśnicy rozeszli się po mapie, a nie zbiegli w jeden rejon.
+    \item \textbf{Krótki dojazd:} dopiero w ostateczności rozstrzyga bliskość celu do danego leśnika.
 \end{enumerate}
 
-Wiek sektora obliczany jest jako:
-\begin{equation}
-age = currentStep - lastPatrolStep
-\end{equation}
-
-Sektory nigdy nie patrolowane traktowane są jako najstarsze.
+Po kilku tickach postoju w sektorze (\texttt{patrol\_dwell}) leśnik rusza dalej, dzięki czemu patrole stale pokrywają teren i wykrywają pożar zanim ten dorośnie do czujnika. Leśnik znajdujący się na sektorze, który właśnie zapłonął, jest automatycznie wycofywany do bazy (\textit{auto-withdraw}).
 
 \subsection{Heurystyka wymaganych brygad}
 
