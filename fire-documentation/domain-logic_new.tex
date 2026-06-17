@@ -252,7 +252,7 @@ gdzie $n_{brigades}$ to liczba gaszących brygad, a $extinguishRate$ to przyrost
 
 \subsection{Zużycie paliwa}
 
-Paliwo jest zużywane w tempie zależnym od klasyfikacji pożaru (Tabela~1 z artykułu Klimka): im intensywniejszy pożar, tym szybciej wypala paliwo.
+Paliwo jest zużywane w tempie zależnym od klasyfikacji pożaru (zgodnie z przyjętą skalą stopni pożaru): im intensywniejszy pożar, tym szybciej wypala paliwo.
 
 \begin{equation}
 fuel_{t+1} = \max\!\left(fuel_t - fuelRate \cdot m_{level},\ 0\right)
@@ -285,7 +285,7 @@ Wartości dorzutu dobrano tak, aby płonący sektor wyraźnie przebijał progi w
 \section{Formalny model: parametryczny L-system}
 \label{sec:lsystem}
 
-Rozprzestrzenianie się pożaru opisano formalnie jako \textbf{parametryczny, kontekstowy, stochastyczny system Lindenmayera (L-system)}. Jest to zgodne z podejściem proponowanym w pracach R. Klimka, w którym dynamikę zjawiska modeluje się gramatyką przepisującą symbole reprezentujące sektory lasu. Las jest słowem nad alfabetem stanów sektora, a kolejne kroki symulacji odpowiadają krokom derywacji gramatyki.
+Rozprzestrzenianie się pożaru opisano formalnie jako \textbf{parametryczny, kontekstowy, stochastyczny system Lindenmayera (L-system)}. Jest to podejście zgodne z literaturą przedmiotu, w którym dynamikę zjawiska modeluje się gramatyką przepisującą symbole reprezentujące sektory lasu. Las jest słowem nad alfabetem stanów sektora, a kolejne kroki symulacji odpowiadają krokom derywacji gramatyki.
 
 L-systemy wywodzą się z formalnego opisu wzrostu organizmów (Lindenmayer, 1968; Prusinkiewicz \& Lindenmayer, \textit{The Algorithmic Beauty of Plants}). Ich siłą jest zwięzłe ujęcie złożonej, samopodobnej dynamiki za pomocą niewielkiego zbioru reguł przepisywania stosowanych równolegle. Pożar lasu, propagujący się lokalnie od sektora do sektora, naturalnie wpisuje się w ten formalizm.
 

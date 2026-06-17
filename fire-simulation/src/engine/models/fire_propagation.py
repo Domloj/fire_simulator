@@ -72,7 +72,7 @@ class FirePropagationConfig:
     wind_multiplier_max: float = 2.0  # Max wind effect multiplier
 
     # Fuel consumption (section 2.4.2 R3)
-    # Rates per fire classification level per Klimek ISD2024:
+    # Rates per fire classification level (ISD2024):
     #   level 1 (EARLY_FIRE):   0.5 units/step  → relative multiplier 0.5
     #   level 2 (MEDIUM_FIRE):  1.0 units/step  → baseline multiplier 1.0
     #   level 3 (FULL_FIRE):    2.0 units/step  → multiplier 2.0
@@ -86,7 +86,7 @@ class FirePropagationConfig:
 
     def __post_init__(self):
         if self.fuel_consumption_multiplier is None:
-            # Keys are fire classification levels 1–4 per Klimek ISD2024 Table 1
+            # Keys are fire classification levels 1-4 (ISD2024)
             object.__setattr__(self, 'fuel_consumption_multiplier', {
                 1: 0.5,   # EARLY_FIRE   — manageable by one engine
                 2: 1.0,   # MEDIUM_FIRE  — baseline = fuel_consumption_rate

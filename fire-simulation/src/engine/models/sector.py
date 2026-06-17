@@ -129,7 +129,7 @@ class Sector:
 
     def get_fire_classification(self) -> int:
         """
-        Return fire classification level 0–5 per Klimek ISD2024 Table 1.
+        Return fire classification level 0–5 per fire classification table (ISD2024).
 
         Used by telemetry and the support system to determine required
         firefighting resources.
