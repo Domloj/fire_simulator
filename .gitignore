@@ -16,3 +16,7 @@ fire-simulation/**/*.egg-info/
 fire-simulation/target/
 
 .firevenv
+
+# Dokumentacja (utrzymywana zewnętrznie, np. Overleaf)
+fire-documentation/
+new-documentation/
