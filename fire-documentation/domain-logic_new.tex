@@ -53,14 +53,7 @@ Dokument opisuje:
 
 \subsection{Przeznaczenie dokumentu}
 
-Dokument przeznaczony jest dla zespołu rozwojowego i utrzymaniowego, przyszłych kontynuatorów projektu, a także dla integratorów systemów ForestFire oraz audytorów technicznych. 
-
-\subsection{Odniesienia}
-
-\begin{itemize}
-    \item Artykuły R. Klimek, AGH UST 
-    \item Rezultaty dotychczas wytworzonych projektów studenckich
-\end{itemize}
+Dokument przeznaczony jest dla zespołu rozwojowego i utrzymaniowego, przyszłych kontynuatorów projektu, a także dla integratorów systemów ForestFire oraz audytorów technicznych.
 
 
 
@@ -93,8 +86,11 @@ Składa się z następujących komponentów:
 \hline
 \textbf{Komponent} & \textbf{Funkcja} & \textbf{Technologia} \\ \hline
 FFSup &
-Główny moduł analityczny i decyzyjny systemu monitorującego &
-Java, Python, Flask \\ \hline
+Moduł wspomagania decyzji: generowanie rekomendacji (MCTS, LLM, heurystyki) &
+Python, Flask \\ \hline
+FFBackend &
+Backend biznesowy: agregacja stanu świata i udostępnianie go frontendowi (SSE), walidacja oraz przekazywanie rozkazów do symulatora &
+Java, Spring Boot \\ \hline
 FFVis &
 Interfejs wizualizacyjny (panel webowy), służący zarówno dla FFSup, jak i FFConf &
 JavaScript, Electron \\ \hline
@@ -155,19 +151,18 @@ Polecenie to należy wywołać w głównym k
 
 \subsection{Przepływ danych}
 \section*{Symulator (FFSim)}
-Symulator (FFSim) generuje dane o sytuacji w sektorach i warunkach pogodowych. Wybiera w sposób losowy sektor, w którym rozpocznie się pożar, a następnie rozprzestrzenia go po pobliskich sektorach, biorąc pod uwagę czynniki środowiskowe, takie jak prędkość i kierunek wiatru.  
+Symulator (FFSim) generuje dane o sytuacji w sektorach i warunkach pogodowych. Wybiera losowo sektor, w którym rozpocznie się pożar, a następnie rozprzestrzenia go po pobliskich sektorach, biorąc pod uwagę czynniki środowiskowe, takie jak prędkość i kierunek wiatru. Generuje dane z czujników i kamer (telemetrię) oraz stan otoczenia, w którym znajdują się patrolujący leśnicy.
 
-Symuluje działania strażaków i patroli leśników po odebraniu poleceń z backendu (FFSup).  
+FFSim symuluje także ruch i działania strażaków oraz patroli leśników po odebraniu poleceń z backendu (FFBackend). Sam nie podejmuje decyzji strategicznych -- jest deterministycznym modelem świata i wykonawcą rozkazów.
 
-Generuje dane z czujników i kamer, a także stan otoczenia, w którym znajdują się patrolujący leśnicy.  
+\section*{System wspomagania decyzji (FFSup)}
+Na podstawie telemetrii przesyłanej z symulatora przez RabbitMQ, moduł wspomagania decyzji (FFSup) oblicza rekomendacje rozkazów dla brygad gaśniczych oraz patroli leśnych za pomocą algorytmu Monte Carlo Tree Search (MCTS) lub modeli LLM. Wygenerowane rekomendacje przekazywane są do wizualizacji (FFVis).
 
-Oblicza rekomendacje rozkazów dla straży pożarnej za pomocą algorytmu Monte Carlo Tree Search, a następnie przesyła je do backendu (FFSup). Przy odpowiednim ustawieniu na frontendzie (FFVis), może automatycznie stosować rekomendacje, bez oczekiwania na zgodę z backendu (FFSup).  
-
-\section*{Backend (FFSup)}
-Backend (FFSup) przekazuje dane do wyświetlenia we frontendzie (FFVis), a także przekazuje polecenia dla strażaków i patroli leśników do symulatora (FFSim).  
+\section*{Backend (FFBackend)}
+Backend (FFBackend, Java/Spring Boot) agreguje stan świata z telemetrii symulatora i udostępnia go frontendowi. Odbiera rozkazy dla strażaków i patroli, waliduje je, a następnie przekazuje przez REST do symulatora (FFSim).
 
 \section*{Frontend (FFVis)}
-Frontend (FFVis) pobiera dane z backendu (FFSup) i wizualizuje je na mapie. Drugą rolą frontend jest pobieranie danych z konfiguratora (FFConf) i wizualizacja procesów edycyjnych monitorowanych obszarów.  
+Frontend (FFVis) pobiera dane z backendu (FFBackend) i wizualizuje je na mapie wraz z rekomendacjami z FFSup. Przy włączonej opcji Auto-Apply automatycznie wysyła rekomendacje jako gotowe rozkazy do backendu (FFBackend), bez konieczności ręcznego zatwierdzania ich przez operatora. Drugą rolą frontendu jest pobieranie danych z konfiguratora (FFConf) i wizualizacja procesów edycyjnych monitorowanych obszarów.
 
 \section*{Administrator (FFConf)}
 Administrator (FFConf) – tylko ten moduł może definiować i modyfikować konfigurację map i punktów infrastruktury oraz sektorów leśnych.  
@@ -594,8 +589,8 @@ Przykładowy zapis JSON:
 Istnieje jeden endpoint HTTP - /run-simulation?interval=<interval>, który pozwala utworzyć subskrypcję na Server Sent Events (SSE) i otrzymywać wiadomości, które wysyłane są z zadanym interwałem czasowym i zawierają aktualny stan symulacji. 
 
 
-\subsection{Główna komunikacja backend-symulator (FFSup-FFSim) }
-Symulator (FFSim) przesyła dane w formacie JSON za pośrednictwem systemu kolejkowego RabbitMQ. Wiadomości te są odbierane przez backend (FFSup) i zawierają następujące informacje:
+\subsection{Główna komunikacja backend-symulator (FFBackend-FFSim) }
+Symulator (FFSim) przesyła dane w formacie JSON za pośrednictwem systemu kolejkowego RabbitMQ. Wiadomości te są odbierane przez backend (FFBackend) i zawierają następujące informacje:
 \begin{itemize}
     \item stan ekip gaśniczych,
     \item stan patroli leśników,
@@ -919,7 +914,7 @@ Lokalizacja bazy jest pomijana ze względu na wiedzę posiadaną przez każdą g
 
 \subsection{Komunikacja z modułem wizualizacji}
 
-Moduł wizualizacji (FFVis) pełni rolę usługową dla backendu (FFSup) oraz modułu konfiguracyjnego (FFConf). Komunikacja realizowana jest za pomocą dwukierunkowego połączenia pomiędzy serwisem backendowym napisanym w języku Java z wykorzystaniem frameworku Spring Boot a jednym z procesów aplikacji opartej o framework ElectronJS.
+Moduł wizualizacji (FFVis) pełni rolę usługową dla backendu (FFBackend) oraz modułu konfiguracyjnego (FFConf). Komunikacja realizowana jest za pomocą dwukierunkowego połączenia pomiędzy serwisem backendowym napisanym w języku Java z wykorzystaniem frameworku Spring Boot a jednym z procesów aplikacji opartej o framework ElectronJS.
 
 \subsubsection{Format danych w komunikacji pomiędzy modułem przetwarzającym a wizualizującym}
 
@@ -1075,7 +1070,7 @@ System generuje logi w kilku kategoriach, odpowiadających poszczególnym warstw
 
 \subsubsection*{Logi aplikacyjne}
 
-Logi aplikacyjne obejmują wszystkie zdarzenia zachodzące w backendzie (FFSup), w szczególności:
+Logi aplikacyjne obejmują wszystkie zdarzenia zachodzące w backendzie (FFBackend), w szczególności:
 \begin{itemize}
     \item obsługę kolejek komunikatów (subskrypcje, otrzymywanie wiadomości, błędy),
     \item aktualizację stanu brygad gaśniczych oraz patroli leśników,
