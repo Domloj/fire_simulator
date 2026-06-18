@@ -7,7 +7,7 @@ Each sector has:
 - fireLevel: [0, 1] - intensywność ognia
 - burnLevel: [0, 1] - spalanie (nieodwracalne)
 - extinguishLevel: [0, 1] - gaszenie
-- temperature: ℝ - temperatura
+- temperature: R - temperatura
 - sectorType: enum - typ sektora
 """
 
@@ -29,13 +29,13 @@ class SectorState(Enum):
 class SectorType(Enum):
     """Vegetation types with flammability characteristics."""
     
-    DECIDUOUS = "DECIDUOUS"        # α ~ 0.8
-    CONIFEROUS = "CONIFEROUS"      # α ~ 1.2
-    MIXED = "MIXED"                # α ~ 1.0
-    FIELD = "FIELD"                # α ~ 1.5
-    FALLOW = "FALLOW"              # α ~ 1.2
-    WATER = "WATER"                # α ~ 0.5
-    UNTRACKED = "UNTRACKED"        # α ~ 1.0
+    DECIDUOUS = "DECIDUOUS"        # alpha 0.8
+    CONIFEROUS = "CONIFEROUS"      # 1.2
+    MIXED = "MIXED"                # 1.0
+    FIELD = "FIELD"                # 1.5
+    FALLOW = "FALLOW"              # 1.2
+    WATER = "WATER"                # 0.5
+    UNTRACKED = "UNTRACKED"        # 1.0
 
 
 @dataclass
@@ -46,16 +46,13 @@ class Sector:
     Main simulation domain object representing a forest sector.
     """
     
-    # Identifiers
     sector_id: int
     row: int
     column: int
     sector_type: SectorType
     
-    # State machine (section 5.1)
     state: SectorState = SectorState.DORMANT
     
-    # Parameters (section 5.2)
     moisture: float = 0.0           # [0, 1] - wilgotność
     fuel: float = 1.0               # [0, 1] - paliwo
     fire_level: float = 0.0         # [0, 1] - intensywność ognia
@@ -63,7 +60,6 @@ class Sector:
     extinguish_level: float = 0.0   # [0, 1] - gaszenie
     temperature: float = 20.0       # R - temperatura
     
-    # Optional location data
     longitude: Optional[float] = None
     latitude: Optional[float] = None
     
@@ -106,30 +102,10 @@ class Sector:
         """Check if sector is currently burning."""
         return self.state == SectorState.BURNING
 
-    # ------------------------------------------------------------------
-    # Fire classification per article, Table 1
-    #
-    # Level | Name          | Resources needed
-    #   0   | NON_COMBUSTED | –
-    #   1   | MILD          | one fire engine
-    #   2   | MODERATE      | local fire station crews
-    #   3   | FULL          | maximum available crews
-    #   4   | SEVERE        | exceeds local capabilities
-    #   5   | COMBUSTED /   | –  (fire over)
-    #       | EXTINGUISHED  |
-    #
-    # Mapping from continuous fireLevel [0,1] to discrete level 0–4:
-    #   0          → 0  (no fire)
-    #   (0, 0.25]  → 1  MILD
-    #   (0.25,0.5] → 2  MODERATE
-    #   (0.5,0.75] → 3  FULL
-    #   (0.75,1.0) → 4  SEVERE
-    #   ASH / EXTINGUISHED → 5
-    # ------------------------------------------------------------------
 
     def get_fire_classification(self) -> int:
         """
-        Return fire classification level 0–5 per fire classification table (ISD2024).
+        Return fire classification level 0-5 per fire classification table (ISD2024).
 
         Used by telemetry and the support system to determine required
         firefighting resources.
@@ -141,12 +117,12 @@ class Sector:
         if self.fire_level <= 0.0:
             return 0
         if self.fire_level <= 0.25:
-            return 1  # EARLY_FIRE
+            return 1
         if self.fire_level <= 0.50:
-            return 2  # MEDIUM_FIRE
+            return 2
         if self.fire_level <= 0.75:
-            return 3  # FULL_FIRE
-        return 4      # EXTREME_FIRE
+            return 3
+        return 4
 
     def get_fire_state_name(self) -> str:
         """
@@ -185,27 +161,22 @@ class Sector:
             dist_to_fire: odległość (w sektorach) do najbliższego płonącego
                 sektora; None gdy poza zasięgiem albo brak pożaru
         """
-        # spalony albo ugaszony — już nie ma czym się martwić
         if self.state in (SectorState.ASH, SectorState.EXTINGUISHED):
             return "LOW"
-
-        # aktywny pożar — poziom z intensywności
         if self.state == SectorState.BURNING and self.fire_level > 0.0:
             return {1: "HIGH", 2: "VERY_HIGH", 3: "VERY_HIGH", 4: "CRITICAL"}[
                 self.get_fire_classification()
             ]
 
-        # sektor bez ognia — bazowy poziom z odległości do pożaru
         if dist_to_fire is None or dist_to_fire >= 4:
-            base = 0          # daleko od ognia: spokojnie
+            base = 0
         elif dist_to_fire == 1:
-            base = 3          # tuż przy froncie
+            base = 3
         elif dist_to_fire == 2:
             base = 2
-        else:                 # dist_to_fire == 3
+        else:                 
             base = 1
 
-        # suchość modyfikuje: bardzo sucho podbija, wilgotno obniża
         dryness = 1.0 - self.moisture
         if dryness > 0.7:
             base += 1

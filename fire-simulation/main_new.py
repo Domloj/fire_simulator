@@ -49,8 +49,6 @@ class EngineHost:
         return self._thread is not None and self._thread.is_alive()
 
     def start(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        # Kolejny start zastępuje poprzednią sesję. Zatrzymujemy ją przed
-        # wzięciem locka, bo stop() czeka na wątek pętli, który sam bierze lock.
         if self.is_running():
             self.stop()
 
@@ -75,12 +73,7 @@ class EngineHost:
                 tick_interval=self.tick_interval,
                 agent_manager=self.agent_manager,
             )
-            # Assign sensor array for telemetry (spec 5.2.2)
             self.engine.sensor_array = sensor_array
-
-            # Wykrywanie pożaru (Krok 3): domyślnie support widzi sektor dopiero
-            # po wykryciu przez sensor/patrol. Można wyłączyć configiem, np. do
-            # eksperymentów porównawczych (support znów ma pełną wiedzę).
             self.engine.detection_enabled = bool(
                 config.get("detection", map_config.get("detection", True))
             )
@@ -103,10 +96,6 @@ class EngineHost:
                 for sid in ignite_ids:
                     self.metrics_tracker.on_ignition(int(sid), tick=0)
 
-            # Konfigurację lasu wysyłamy do FFSup (support rozpozna ją po polach
-            # location + forestId i ustawi geometrię + bazy agentów). Republikujemy
-            # ją przez kilka pierwszych ticków, bo konsument supportu mógł jeszcze
-            # nie być gotowy w chwili startu.
             if map_config.get("location") and (
                 map_config.get("forestId") is not None or map_config.get("forestName")
             ):
@@ -135,8 +124,6 @@ class EngineHost:
 
     def _run_loop(self) -> None:
         while not self._stop.is_set():
-            # W pauzie pętla nie wykonuje kroków, ale żyje, żeby dało się
-            # wznowić albo robić kroki ręcznie.
             if self._paused.is_set():
                 time.sleep(0.05)
                 continue
@@ -195,7 +182,6 @@ class EngineHost:
             self.metrics_tracker.on_brigade_dispatched(brigade_id, tick)
 
     def manual_step(self, ticks: int = 1) -> Dict[str, Any]:
-        # Krok ręczny dozwolony gdy pętla nie biegnie albo jest zapauzowana.
         if self.is_running() and not self._paused.is_set():
             raise RuntimeError("Zapauzuj symulację przed ręcznym krokowaniem")
         with self._lock:
@@ -207,7 +193,6 @@ class EngineHost:
             return self.engine.get_snapshot().to_dict()
 
     def step_back(self, ticks: int = 1) -> Dict[str, Any]:
-        # Cofanie dozwolone na tych samych zasadach co krok w przód.
         if self.is_running() and not self._paused.is_set():
             raise RuntimeError("Zapauzuj symulację przed cofaniem kroku")
         with self._lock:
@@ -218,7 +203,6 @@ class EngineHost:
                 if not self.engine.step_back():
                     break
                 moved += 1
-            # Po cofnięciu publikujemy przywrócony stan, żeby mapa się odświeżyła.
             self.engine.publish_current_state()
             snap = self.engine.get_snapshot().to_dict()
             return {"tick": snap["tick"], "steppedBack": moved}
@@ -232,8 +216,6 @@ class EngineHost:
 
 host = EngineHost()
 
-
-# ─── Config parsing helpers ──────────────────────────────────────────────────
 
 def _sector_type(value: Any) -> SectorType:
     if isinstance(value, SectorType):
@@ -269,11 +251,8 @@ def _build_forest_map(cfg: Dict[str, Any]) -> Dict[int, Sector]:
         for entry in sectors_cfg:
             initial = entry.get("initialState", {}) or {}
             sid = int(entry["sectorId"])
-            # config z frontendu trzyma fireLevel w skali 0-100, silnik w 0-1
             raw_fire = float(initial.get("fireLevel", 0.0))
             fire_level = raw_fire / 100.0 if raw_fire > 1.0 else raw_fire
-            # config trzyma geometrię jako contours; środek sektora potrzebny
-            # by dopasować rozkaz (location) do sektora w agent managerze
             lon, lat = _sector_centroid(entry)
             sector = Sector(
                 sector_id=sid,
@@ -287,7 +266,6 @@ def _build_forest_map(cfg: Dict[str, Any]) -> Dict[int, Sector]:
                 longitude=lon,
                 latitude=lat,
             )
-            # sektor z ogniem w configu od razu płonie, inaczej silnik go pominie
             if fire_level > 0.0:
                 sector.state = SectorState.BURNING
             forest[sid] = sector
@@ -365,7 +343,6 @@ def _build_sensor_array(cfg: Dict[str, Any], rng: RngManager) -> SensorArray:
             )
         return sensor_array
 
-    # format słownikowy: typ -> lista sektorów
     sector_sensors: Dict[int, List[SensorType]] = {}
     for sensor_type_str, sector_ids in sensors_config.items():
         try:
@@ -411,9 +388,6 @@ def _ignite_initial(engine: SimulationEngine, cfg: Dict[str, Any]) -> List[int]:
 
     chosen = engine.ignite_random_sector()
     return [chosen] if chosen is not None else []
-
-
-# ─── REST endpoints (spec section 5.1) ───────────────────────────────────────
 
 @app.route("/run_simulation", methods=["POST"])
 def run_simulation():

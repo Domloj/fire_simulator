@@ -1,5 +1,5 @@
 """
-Scenariusze testowe FFSim (spec sekcja 10 — minimum 7 scenariuszy).
+Scenariusze testowe FFSim
 
 Uruchomienie:
     cd fire-simulation
@@ -75,14 +75,12 @@ def ash_count(engine):
 def test_S1_single_fire_no_wind():
     """Pożar w centrum siatki, brak wiatru — ogień się rozprzestrzenia."""
     engine = make_engine(rows=10, cols=10, seed=1, initial_wind=Wind(speed=0.0))
-    center = 55  # wiersz 5, kolumna 4 (0-indexed) w siatce 10x10
+    center = 55
     engine.ignite_sector(center)
 
-    # po 5 tickach powinny płonąć sąsiednie sektory
     run_ticks(engine, 5)
     assert burning_count(engine) > 1, "po 5 tickach pożar powinien objąć sąsiednie sektory"
 
-    # po 15 tickach pożar powinien dotrzeć do przynajmniej 4 sektorów
     run_ticks(engine, 10)
     total_affected = burning_count(engine) + ash_count(engine)
     assert total_affected >= 4, f"po 15 tickach pożar powinien objąć przynajmniej 4 sektory, got {total_affected}"
@@ -95,13 +93,12 @@ def test_S2_single_fire_strong_wind():
     rows, cols = 10, 10
     engine = make_engine(rows=rows, cols=cols, seed=2,
                          initial_wind=Wind(speed=40.0, direction_degrees=90.0))
-    left_center = (rows // 2) * cols + 1  # lewa kolumna, środkowy wiersz
+    left_center = (rows // 2) * cols + 1
     engine.ignite_sector(left_center)
 
     run_ticks(engine, 15)
 
     snap = engine.current_snapshot
-    # Co najmniej jeden sektor pali się w prawej połowie siatki
     right_half_burning = any(
         s.state == SectorState.BURNING and s.column >= cols // 2
         for s in snap.sectors.values()
@@ -114,7 +111,7 @@ def test_S2_single_fire_strong_wind():
 def test_S3_multiple_fires():
     """Trzy ogniska w różnych narożnikach — wszystkie powinny się rozwijać."""
     engine = make_engine(rows=10, cols=10, seed=3)
-    ignite_ids = [1, 10, 91]  # lewy górny, prawy górny, lewy dolny
+    ignite_ids = [1, 10, 91]
     for sid in ignite_ids:
         engine.ignite_sector(sid)
 
@@ -141,7 +138,6 @@ def test_S4_few_brigades_many_fires():
 
     run_ticks(engine, 5)
 
-    # brygada nie może ugasić wszystkich — powinny nadal płonąć sektory
     still_burning = burning_count(engine)
     assert still_burning >= 1, "przynajmniej jeden sektor powinien nadal płonąć"
 
@@ -197,14 +193,11 @@ def test_S7_invalid_orders():
 
     sectors = engine.current_snapshot.sectors
 
-    # MISSING_FIELD — brak fireBrigadeId
     r = am.apply_brigade_order(
         {"action": "EXTINGUISH", "location": {"lon": 0.0, "lat": 0.0}},
         sectors,
     )
     assert r.error_code == "MISSING_FIELD"
-
-    # UNKNOWN_AGENT — nieistniejąca brygada
     r = am.apply_brigade_order(
         {"fireBrigadeId": 999, "action": "EXTINGUISH",
          "location": {"lon": 0.0, "lat": 0.0}},
@@ -212,7 +205,6 @@ def test_S7_invalid_orders():
     )
     assert r.error_code == "UNKNOWN_AGENT"
 
-    # INVALID_ACTION_FOR_AGENT_TYPE — nieznana akcja
     r = am.apply_brigade_order(
         {"fireBrigadeId": 1, "action": "FLY",
          "location": {"lon": 0.0, "lat": 0.0}},
@@ -220,29 +212,22 @@ def test_S7_invalid_orders():
     )
     assert r.error_code == "INVALID_ACTION_FOR_AGENT_TYPE"
 
-    # SECTOR_NOT_ON_FIRE — rozkaz gaszenia spokojnego sektora
-    # sektor 13 (środek 5x5) — jeszcze nie płonie
     sector_13 = sectors[13]
     r = am.apply_brigade_order(
         {"fireBrigadeId": 1, "action": "EXTINGUISH",
          "location": {"lon": sector_13.longitude or 0.0, "lat": sector_13.latitude or 0.0}},
         sectors,
     )
-    # lokalizacja bez lon/lat daje UNKNOWN_SECTOR zanim sprawdzimy stan
     assert r.error_code in ("SECTOR_NOT_ON_FIRE", "UNKNOWN_SECTOR")
-
-
-# ─── Scenariusz 8: pożar gaśnie po wypaleniu paliwa ──────────────────────────
 
 def test_S8_burnout():
     """Sektor z niskim paliwem powinien wypalić się do stanu ASH."""
     config = FirePropagationConfig()
     forest = build_grid(3, 3)
-    # środkowy sektor ma bardzo mało paliwa
     forest[5] = Sector(
         sector_id=5, row=1, column=1,
         sector_type=SectorType.MIXED,
-        fuel=0.05,  # bardzo mało paliwa
+        fuel=0.05,
     )
     rng = RngManager(seed=9)
     engine = SimulationEngine(
@@ -251,7 +236,6 @@ def test_S8_burnout():
     engine.initialize(seed=9)
     engine.ignite_sector(5)
 
-    # czekamy aż paliwo się wypali (max 20 ticków)
     for _ in range(20):
         engine.step()
         if engine.current_snapshot.sectors[5].state == SectorState.ASH:
@@ -321,7 +305,6 @@ class _RecordingPublisher:
         return True
 
     def __getattr__(self, _):
-        # pozostałe publish_* są no-opami
         return lambda *a, **k: True
 
 
@@ -354,7 +337,6 @@ def test_S10_sensors_react_to_fire():
 def test_S11_support_detection_gating():
     """Support widzi ogień dopiero po wykryciu sektora przez sensor."""
     engine = make_engine(rows=3, cols=3, seed=12)
-    # sensor tylko na sektorze 1, sektor 9 zostaje bez pokrycia
     engine.sensor_array.add_sensor(
         sector_id=1, sensor_id=0, sensor_types=[SensorType.CO2],
         location={"lon": 0.0, "lat": 0.0},
@@ -362,17 +344,15 @@ def test_S11_support_detection_gating():
     pub = _RecordingPublisher()
     engine.rabbitmq_publisher = pub
 
-    engine.ignite_sector(1)  # ma sensor
-    engine.ignite_sector(9)  # bez sensora i patrolu
+    engine.ignite_sector(1)
+    engine.ignite_sector(9)
     run_ticks(engine, 6)
 
     last = {s["sectorId"]: s["state"] for s in pub.support_msgs[-1]["sectors"]}
 
-    # sektor 1 wykryty -> support widzi realny ogień
     assert 1 in engine._detected_sectors
     assert last[1]["fireLevel"] > 0
 
-    # sektor 9 niewykryty, ale faktycznie płonie -> support dostaje zero
     assert 9 not in engine._detected_sectors
     assert engine.current_snapshot.sectors[9].state == SectorState.BURNING
     assert last[9]["fireLevel"] == 0.0
@@ -385,7 +365,7 @@ def test_S11b_detection_disabled_gives_full_state():
     pub = _RecordingPublisher()
     engine.rabbitmq_publisher = pub
 
-    engine.ignite_sector(9)  # bez sensora ani patrolu
+    engine.ignite_sector(9)
     run_ticks(engine, 6)
 
     last = {s["sectorId"]: s["state"] for s in pub.support_msgs[-1]["sectors"]}
@@ -416,7 +396,6 @@ def test_S12_fire_state_names_match_backend_enum():
     sector.state = SectorState.ASH
     assert sector.get_fire_state_name() == "COMBUSTED"
 
-    # wszystkie zwracane wartości mieszczą się w enumie backendu
     assert {sector.get_fire_state_name()} <= allowed
 
 
@@ -428,10 +407,9 @@ def test_S13_threat_level_in_telemetry():
     engine = make_engine(rows=3, cols=3, seed=20)
     pub = _RecordingPublisher()
     engine.rabbitmq_publisher = pub
-    engine.ignite_sector(5)  # środek siatki 3x3
+    engine.ignite_sector(5)
     run_ticks(engine, 8)
 
-    # threatLevel jest na kanale mapy (telemetry["sectors"]), nie w feedzie supportu
     telemetry = engine._phase_telemetry_generation(
         next_sectors=engine.current_snapshot.sectors,
         previous_sectors=engine.current_snapshot.sectors,
@@ -441,7 +419,6 @@ def test_S13_threat_level_in_telemetry():
     )
     by_id = {s["sectorId"]: s for s in telemetry["sectors"]}
     assert all(s["threatLevel"] in allowed for s in telemetry["sectors"])
-    # płonący środek ma wysoki poziom zagrożenia
     assert by_id[5]["threatLevel"] in {"HIGH", "VERY_HIGH", "CRITICAL"}
 
 
@@ -467,11 +444,9 @@ def test_S14_step_back_restores_state():
     snap_back = {sid: s.fire_level for sid, s in engine.current_snapshot.sectors.items()}
     assert snap_back == snap4, "po cofnięciu stan sektorów powinien wrócić do tick4"
 
-    # po cofnięciu da się znów iść w przód
     engine.step()
     assert engine.tick_count == tick4 + 1
 
-    # nie można cofnąć poniżej stanu początkowego w nieskończoność
     for _ in range(50):
         if not engine.step_back():
             break

@@ -20,7 +20,7 @@ LABEL org.opencontainers.image.version="${APP_VERSION}"
 WORKDIR /app
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends curl \
+	&& apt-get install -y --no-install-recommends curl dos2unix \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1000 appuser || true \
@@ -31,9 +31,10 @@ RUN chown appuser:appuser /app/app.jar
 
 RUN mkdir -p /var/log/fire-backend && chown -R appuser:appuser /var/log/fire-backend
 
+COPY entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh && chown appuser:appuser /entrypoint.sh
+
 USER appuser
 EXPOSE 8181
 
-COPY --chown=appuser:appuser entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

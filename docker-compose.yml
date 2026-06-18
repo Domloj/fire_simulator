@@ -69,6 +69,7 @@ services:
     container_name: simulation
     volumes:
       - ./logs/fire-simulation:/var/log/fire-simulation
+      - ./fire-simulation/output:/code/output
     env_file:
       - ./fire-simulation/.env
     environment:

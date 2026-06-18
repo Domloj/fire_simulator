@@ -1,5 +1,5 @@
 """
-Experiment Logger for FFSim — Spec section 9.
+Experiment Logger for FFSim - Spec section 9.
 
 Per-tick JSONL logging z metrykami eksperymentu:
     tick, burning, burnt, detectionLatency, responseLatency,
@@ -53,15 +53,15 @@ class ExperimentLogger:
     }
 
     Znaczenia pól:
-        tick              — numer bieżącego kroku (od 0).
-        burning           — liczba sektorów BURNING.
-        burnt             — liczba sektorów ASH lub EXTINGUISHED.
-        detectionLatency  — śr. ticki od zapłonu do pierwszego rozkazu
+        tick              - numer bieżącego kroku (od 0).
+        burning           - liczba sektorów BURNING.
+        burnt             - liczba sektorów ASH lub EXTINGUISHED.
+        detectionLatency  - śr. ticki od zapłonu do pierwszego rozkazu
                             dotyczącego danego ogniska; null gdy brak danych.
-        responseLatency   — śr. ticki od rozkazu gaszenia do przybycia
+        responseLatency   - śr. ticki od rozkazu gaszenia do przybycia
                             brygady do sektora; null gdy brak danych.
-        activeAgents      — agenci nie będący w AVAILABLE.
-        ordersReceived    — lista rozkazów z bieżącego ticku.
+        activeAgents      - agenci nie będący w AVAILABLE.
+        ordersReceived    - lista rozkazów z bieżącego ticku.
     """
 
     def __init__(self, path: str) -> None:
@@ -75,10 +75,6 @@ class ExperimentLogger:
         self._lock = threading.Lock()
         self._file = open(self._path, "w", encoding="utf-8", buffering=1)
         logger.info("ExperimentLogger → %s", self._path)
-
-    # ------------------------------------------------------------------
-    # Główna metoda — wywołać raz na tick
-    # ------------------------------------------------------------------
 
     def record_tick(
         self,
@@ -100,13 +96,13 @@ class ExperimentLogger:
             agent_manager:      Obiekt AgentManager (do statystyk agentów).
             orders_this_tick:   Lista rozkazów otrzymanych w tym ticku,
                                 format "AKCJA:sectorId" (np. "EXTINGUISH:14").
-            ignition_tick_map:  {sector_id: tick_zapłonu} — aktualizowany
+            ignition_tick_map:  {sector_id: tick_zapłonu} - aktualizowany
                                 przez silnik przy każdym nowym zapłonie.
-            first_order_tick_map: {sector_id: tick_rozkazu} — tick, w którym
+            first_order_tick_map: {sector_id: tick_rozkazu} - tick, w którym
                                 support wydał pierwszy rozkaz dla tego ogniska.
-            brigade_dispatch_map: {brigade_id: tick_rozkazu} — tick wysłania
+            brigade_dispatch_map: {brigade_id: tick_rozkazu} - tick wysłania
                                 rozkazu EXTINGUISH dla brygady.
-            brigade_arrive_map:   {brigade_id: tick_przybycia} — tick przybycia
+            brigade_arrive_map:   {brigade_id: tick_przybycia} - tick przybycia
                                 brygady do sektora (EXTINGUISHING).
         """
         burning, burnt = self._count_sector_states(sectors)
@@ -130,15 +126,10 @@ class ExperimentLogger:
 
         self._write(record)
 
-    # ------------------------------------------------------------------
-    # Kalkulacja metryk
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _count_sector_states(sectors: Dict[int, "Sector"]) -> tuple[int, int]:
         """Zwraca (burning_count, burnt_count)."""
-        # Import lokalny — unikamy kołowego importu na poziomie modułu
-        from src.engine.models.sector import SectorState  # type: ignore
+        from src.engine.models.sector import SectorState
 
         burning = 0
         burnt = 0
@@ -196,10 +187,6 @@ class ExperimentLogger:
             return None
         return round(sum(latencies) / len(latencies), 2)
 
-    # ------------------------------------------------------------------
-    # I/O
-    # ------------------------------------------------------------------
-
     def _write(self, record: Dict[str, Any]) -> None:
         """Zapisuje rekord JSON do pliku (thread-safe, buforowane liniowo)."""
         line = json.dumps(record, ensure_ascii=False)
@@ -224,8 +211,6 @@ class ExperimentLogger:
         return f"ExperimentLogger(path={self._path}, closed={self._file.closed})"
 
 
-# ─── Tracker stanu — pomocnicza klasa dla silnika ────────────────────────────
-
 class SimulationMetricsTracker:
     """
     Śledzi dane potrzebne do wyliczenia metryk per tick.
@@ -242,24 +227,11 @@ class SimulationMetricsTracker:
     """
 
     def __init__(self) -> None:
-        # sector_id → tick pierwszego zapłonu
         self.ignition_tick_map: Dict[int, int] = {}
-
-        # sector_id → tick pierwszego rozkazu dotyczącego tego ogniska
         self.first_order_tick_map: Dict[int, int] = {}
-
-        # brigade_id → tick wysłania rozkazu EXTINGUISH
         self.brigade_dispatch_map: Dict[int, int] = {}
-
-        # brigade_id → tick przybycia do sektora
         self.brigade_arrive_map: Dict[int, int] = {}
-
-        # Rozkazy z bieżącego ticku (resetowane co tick)
         self._orders_this_tick: List[str] = []
-
-    # ------------------------------------------------------------------
-    # Aktualizacje z silnika
-    # ------------------------------------------------------------------
 
     def on_ignition(self, sector_id: int, tick: int) -> None:
         """Wywołać gdy sektor zapłonie po raz pierwszy."""
@@ -291,10 +263,6 @@ class SimulationMetricsTracker:
         if brigade_id not in self.brigade_arrive_map:
             self.brigade_arrive_map[brigade_id] = tick
 
-    # ------------------------------------------------------------------
-    # Interfejs dla loggera
-    # ------------------------------------------------------------------
-
     def flush_orders(self) -> List[str]:
         """
         Zwraca rozkazy z bieżącego ticku i resetuje listę.
@@ -309,7 +277,7 @@ class SimulationMetricsTracker:
         """
         Zwraca kopię wszystkich mappings do przekazania do record_tick().
 
-        Nie usuwa danych — te są kumulatywne przez całą symulację.
+        Nie usuwa danych - te są kumulatywne przez całą symulację.
         """
         return {
             "ignition_tick_map": dict(self.ignition_tick_map),

@@ -32,7 +32,6 @@ class SimulationEvent:
     event_type: EventType
     sector_id: int
     
-    # Event-specific data
     old_value: float = None
     new_value: float = None
     
