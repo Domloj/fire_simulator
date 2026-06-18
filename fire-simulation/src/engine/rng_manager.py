@@ -26,7 +26,7 @@ class RngManager:
         
         self.seed = seed
         self.rng = np.random.RandomState(seed)
-        self.call_count = 0  # Track RNG calls for debugging
+        self.call_count = 0
 
     def random(self) -> float:
         """

@@ -1,40 +1,44 @@
-2026-05-12T18:07:53.221 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - Starting FireBackendApplication v0.0.1-SNAPSHOT using Java 21.0.11 with PID 1 (/app/app.jar started by appuser in /app)
-2026-05-12T18:07:53.227 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - The following 1 profile is active: "dev"
-2026-05-12T18:07:57.759 [INFO] [fire-backend] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8181 (http)
-2026-05-12T18:07:57.783 [INFO] [fire-backend] o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8181"]
-2026-05-12T18:07:57.791 [INFO] [fire-backend] o.a.catalina.core.StandardService - Starting service [Tomcat]
-2026-05-12T18:07:57.793 [INFO] [fire-backend] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
-2026-05-12T18:07:57.887 [INFO] [fire-backend] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
-2026-05-12T18:07:57.895 [INFO] [fire-backend] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 4425 ms
-2026-05-12T18:07:59.837 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - SimulationStateService initialized. Auto-execution of recommendations has been removed; frontend must send orders to execute recommendations.
-2026-05-12T18:07:59.886 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - RabbitMQ consumers ready
-2026-05-12T18:08:01.459 [INFO] [fire-backend] o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
-2026-05-12T18:08:01.612 [INFO] [fire-backend] o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8181"]
-2026-05-12T18:08:01.660 [INFO] [fire-backend] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8181 (http) with context path ''
-2026-05-12T18:08:01.703 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - Started FireBackendApplication in 10.375 seconds (process running for 12.447)
-2026-05-12T18:08:01.867 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - Listing registered request mappings:
-2026-05-12T18:08:01.870 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/llm-mode]} => SimulationStateController#setLlmMode
-2026-05-12T18:08:01.876 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - { [/error]} => BasicErrorController#error
-2026-05-12T18:08:01.877 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/orderForestPatrol]} => OrdersController#sentOrderPatrol
-2026-05-12T18:08:01.878 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/send-simulation-request-debug]} => SimpleTestController#debugSend
-2026-05-12T18:08:01.879 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/run-simulation], produces [text/event-stream]} => SimulationStateController#runSimulation
-2026-05-12T18:08:01.880 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/ping]} => SimpleTestController#ping
-2026-05-12T18:08:01.882 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/orderFireBrigade]} => OrdersController#sentOrderBrigade
-2026-05-12T18:08:01.883 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/orderFireBrigade]} => SimulationStateController#orderFireBrigade
-2026-05-12T18:08:01.884 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/assignBrigades]} => SimulationStateController#assignBrigades
-2026-05-12T18:08:01.887 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - { [/error], produces [text/html]} => BasicErrorController#errorHtml
-2026-05-12T18:08:01.889 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/send-simulation-request]} => SimulationStateController#sendSimulationRequest
-2026-05-12T18:08:01.891 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/simulation/llm-chat], produces [text/event-stream]} => SimulationStateController#streamLlmChat
-2026-05-12T18:08:01.893 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/set-speed]} => SimulationStateController#setSimulationSpeed
-2026-05-12T18:08:01.894 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/orderForestPatrol]} => SimulationStateController#orderForestPatrol
-2026-05-12T18:08:01.896 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/send-simulation-request]} => CompatibilityController#sendSimulationRequestRoot
-2026-05-12T18:08:01.898 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/simulation/snapshot]} => SimulationStateController#getSimulationSnapshot
-2026-05-12T18:08:01.899 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/stop-simulation]} => SimulationStateController#sendStopRequest
-2026-05-12T18:08:04.720 [INFO] [fire-backend] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
-2026-05-12T18:08:04.721 [INFO] [fire-backend] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
-2026-05-12T18:08:04.727 [INFO] [fire-backend] o.s.web.servlet.DispatcherServlet - Completed initialization in 5 ms
-2026-05-12T18:08:04.889 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Attempting to connect to: [rabbitmq:5672]
-2026-05-12T18:08:04.897 [WARN] [fire-backend] o.s.b.a.amqp.RabbitHealthIndicator - Rabbit health check failed
+2026-06-18T19:25:46.637 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - Starting FireBackendApplication v0.0.1-SNAPSHOT using Java 21.0.11 with PID 1 (/app/app.jar started by appuser in /app)
+2026-06-18T19:25:46.646 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - The following 1 profile is active: "dev"
+2026-06-18T19:25:54.256 [INFO] [fire-backend] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8181 (http)
+2026-06-18T19:25:54.297 [INFO] [fire-backend] o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8181"]
+2026-06-18T19:25:54.307 [INFO] [fire-backend] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-06-18T19:25:54.310 [INFO] [fire-backend] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-06-18T19:25:54.434 [INFO] [fire-backend] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-06-18T19:25:54.440 [INFO] [fire-backend] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 7309 ms
+2026-06-18T19:25:56.672 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - SimulationStateService initialized. Auto-execution of recommendations has been removed; frontend must send orders to execute recommendations.
+2026-06-18T19:25:56.747 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - RabbitMQ consumers ready
+2026-06-18T19:25:59.488 [INFO] [fire-backend] o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-06-18T19:25:59.705 [INFO] [fire-backend] o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8181"]
+2026-06-18T19:25:59.756 [INFO] [fire-backend] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8181 (http) with context path ''
+2026-06-18T19:25:59.809 [INFO] [fire-backend] p.e.a.k.f.FireBackendApplication - Started FireBackendApplication in 16.249 seconds (process running for 19.396)
+2026-06-18T19:26:00.130 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - Listing registered request mappings:
+2026-06-18T19:26:00.134 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/step-back]} => SimulationStateController#stepBack
+2026-06-18T19:26:00.148 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - { [/error]} => BasicErrorController#error
+2026-06-18T19:26:00.150 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/resume]} => SimulationStateController#resumeSimulation
+2026-06-18T19:26:00.153 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/orderFireBrigade]} => OrdersController#sentOrderBrigade
+2026-06-18T19:26:00.155 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/run-simulation], produces [text/event-stream]} => SimulationStateController#runSimulation
+2026-06-18T19:26:00.158 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/send-simulation-request]} => CompatibilityController#sendSimulationRequestRoot
+2026-06-18T19:26:00.160 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/pause]} => SimulationStateController#pauseSimulation
+2026-06-18T19:26:00.163 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/ping]} => SimpleTestController#ping
+2026-06-18T19:26:00.166 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/orderFireBrigade]} => SimulationStateController#orderFireBrigade
+2026-06-18T19:26:00.171 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/step]} => SimulationStateController#stepForward
+2026-06-18T19:26:00.178 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/assignBrigades]} => SimulationStateController#assignBrigades
+2026-06-18T19:26:00.180 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/send-simulation-request-debug]} => SimpleTestController#debugSend
+2026-06-18T19:26:00.183 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/llm-mode]} => SimulationStateController#setLlmMode
+2026-06-18T19:26:00.184 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/orderForestPatrol]} => SimulationStateController#orderForestPatrol
+2026-06-18T19:26:00.189 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/set-speed]} => SimulationStateController#setSimulationSpeed
+2026-06-18T19:26:00.191 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/simulation/snapshot]} => SimulationStateController#getSimulationSnapshot
+2026-06-18T19:26:00.193 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/stop-simulation]} => SimulationStateController#sendStopRequest
+2026-06-18T19:26:00.197 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/orderForestPatrol]} => OrdersController#sentOrderPatrol
+2026-06-18T19:26:00.199 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - { [/error], produces [text/html]} => BasicErrorController#errorHtml
+2026-06-18T19:26:00.202 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {GET [/simulation/llm-chat], produces [text/event-stream]} => SimulationStateController#streamLlmChat
+2026-06-18T19:26:00.206 [INFO] [fire-backend] p.e.a.k.f.config.MappingLogger - {POST [/simulation/send-simulation-request]} => SimulationStateController#sendSimulationRequest
+2026-06-18T19:26:00.324 [INFO] [fire-backend] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-06-18T19:26:00.326 [INFO] [fire-backend] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-06-18T19:26:00.332 [INFO] [fire-backend] o.s.web.servlet.DispatcherServlet - Completed initialization in 4 ms
+2026-06-18T19:26:00.975 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Attempting to connect to: [rabbitmq:5672]
+2026-06-18T19:26:00.983 [WARN] [fire-backend] o.s.b.a.amqp.RabbitHealthIndicator - Rabbit health check failed
 org.springframework.amqp.AmqpConnectException: java.net.ConnectException: Connection refused
 	at org.springframework.amqp.rabbit.support.RabbitExceptionTranslator.convertRabbitAccessException(RabbitExceptionTranslator.java:61)
 	at org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.createBareConnection(AbstractConnectionFactory.java:622)
@@ -130,8 +134,13 @@ Caused by: java.net.ConnectException: Connection refused
 	at org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.connect(AbstractConnectionFactory.java:637)
 	at org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.createBareConnection(AbstractConnectionFactory.java:584)
 	... 78 common frames omitted
-2026-05-12T18:08:10.267 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Attempting to connect to: [rabbitmq:5672]
-2026-05-12T18:08:10.270 [WARN] [fire-backend] o.s.b.a.amqp.RabbitHealthIndicator - Rabbit health check failed
+2026-06-18T19:26:00.997 [INFO] [fire-backend] p.e.a.k.f.c.SimulationStateController - Requested simulation interval 2 ms is below minimum; clamping to 1000 ms
+2026-06-18T19:26:00.999 [INFO] [fire-backend] p.e.a.k.f.c.SimulationStateController - Starting support service in default mode (LLM configuration from env/.env)
+2026-06-18T19:26:01.388 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - Starting simulation - interval: 1s, sectors: 16, brigades: 16, patrols: 0
+2026-06-18T19:26:01.414 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - State reset for new simulation - sectors: 16, brigades: 16, patrols: 0
+2026-06-18T19:26:01.509 [INFO] [fire-backend] p.e.a.k.f.c.SimulationStateController - Frontend connected to LLM chat stream
+2026-06-18T19:26:06.219 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Attempting to connect to: [rabbitmq:5672]
+2026-06-18T19:26:06.222 [WARN] [fire-backend] o.s.b.a.amqp.RabbitHealthIndicator - Rabbit health check failed
 org.springframework.amqp.AmqpConnectException: java.net.ConnectException: Connection refused
 	at org.springframework.amqp.rabbit.support.RabbitExceptionTranslator.convertRabbitAccessException(RabbitExceptionTranslator.java:61)
 	at org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.createBareConnection(AbstractConnectionFactory.java:622)
@@ -227,43 +236,48 @@ Caused by: java.net.ConnectException: Connection refused
 	at org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.connect(AbstractConnectionFactory.java:637)
 	at org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.createBareConnection(AbstractConnectionFactory.java:584)
 	... 78 common frames omitted
-2026-05-12T18:08:13.850 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_agents_forester bound to exchange fire_updates with routing key simulation.telemetry.agents.forester
-2026-05-12T18:08:13.880 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-NkUyOPqHmUd2JjHeo_YQtg consuming from simulation_telemetry_agents_forester has been registered
-2026-05-12T18:08:13.880 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_wind_speed bound to exchange fire_updates with routing key simulation.telemetry.sensors.wind_speed
-2026-05-12T18:08:13.889 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-iPN2zcuaQFZtFYK89ljXAg consuming from simulation_telemetry_sensors_wind_speed has been registered
-2026-05-12T18:08:13.895 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_agents_fire_brigade bound to exchange fire_updates with routing key simulation.telemetry.agents.fire_brigade
-2026-05-12T18:08:13.903 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-lM4T-HClMFC3NMKZJrl12A consuming from simulation_telemetry_agents_fire_brigade has been registered
-2026-05-12T18:08:13.929 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_map_sector_state_fast bound to exchange fire_updates with routing key simulation.telemetry.map.sector_state_fast
-2026-05-12T18:08:13.935 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_wind_direction bound to exchange fire_updates with routing key simulation.telemetry.sensors.wind_direction
-2026-05-12T18:08:13.940 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-J_dpQ3Ahm-08Y2j4jtAqTg consuming from simulation_telemetry_map_sector_state_fast has been registered
-2026-05-12T18:08:13.942 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-7ZaAK7y6BXLtA21AQXwC6g consuming from simulation_telemetry_sensors_wind_direction has been registered
-2026-05-12T18:08:13.946 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_litter_moisture bound to exchange fire_updates with routing key simulation.telemetry.sensors.litter_moisture
-2026-05-12T18:08:13.955 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-JFOwkSmZibWbeM1AhY5OmQ consuming from simulation_telemetry_sensors_litter_moisture has been registered
-2026-05-12T18:08:13.955 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_temp_humidity bound to exchange fire_updates with routing key simulation.telemetry.sensors.temp_humidity
-2026-05-12T18:08:13.958 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_co2 bound to exchange fire_updates with routing key simulation.telemetry.sensors.co2
-2026-05-12T18:08:13.963 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-S4OuXNW27uyvINZOSvp1hg consuming from simulation_telemetry_sensors_temp_humidity has been registered
-2026-05-12T18:08:13.965 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-wZAKC5tJ9Q4WtFipPQD2Iw consuming from simulation_telemetry_sensors_co2 has been registered
-2026-05-12T18:08:13.981 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_map_sector_state bound to exchange fire_updates with routing key simulation.telemetry.map.sector_state
-2026-05-12T18:08:13.987 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_agents_forester_batch bound to exchange fire_updates with routing key simulation.telemetry.agents.forester_batch
-2026-05-12T18:08:13.988 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-sHl13A03sVhIjGOBFDq0ZQ consuming from simulation_telemetry_map_sector_state has been registered
-2026-05-12T18:08:13.992 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_pm2_5 bound to exchange fire_updates with routing key simulation.telemetry.sensors.pm2_5
-2026-05-12T18:08:13.994 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-ZWoWKSelIQZNdIRfZKXZYg consuming from simulation_telemetry_agents_forester_batch has been registered
-2026-05-12T18:08:13.999 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-SpSyoiFi_6oorv8RKzo0Ug consuming from simulation_telemetry_sensors_pm2_5 has been registered
-2026-05-12T18:08:14.007 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_camera bound to exchange fire_updates with routing key simulation.telemetry.sensors.camera
-2026-05-12T18:08:14.010 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue backend_llm_requests bound to exchange fire_updates with routing key support.llm.requests
-2026-05-12T18:08:14.013 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_agents_fire_brigade_batch bound to exchange fire_updates with routing key simulation.telemetry.agents.fire_brigade_batch
-2026-05-12T18:08:14.014 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-UldjWn7OkMP2hR_J3KjN5A consuming from simulation_telemetry_sensors_camera has been registered
-2026-05-12T18:08:14.015 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue backend_llm_responses bound to exchange fire_updates with routing key support.llm.responses
-2026-05-12T18:08:14.018 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-rVrWIOlpApngbKP3LIY3Uw consuming from backend_llm_requests has been registered
-2026-05-12T18:08:14.020 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-xNqXHxXXe7yCJ7untSZ3XA consuming from simulation_telemetry_agents_fire_brigade_batch has been registered
-2026-05-12T18:08:14.028 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-eN-frGDDNBXlhBc02tnuJA consuming from backend_llm_responses has been registered
-2026-05-12T18:08:14.040 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_recommendations bound to exchange fire_updates with routing key simulation.recommendations
-2026-05-12T18:08:14.042 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_llm_propositions_responses bound to exchange fire_updates with routing key support.llm.propositions.responses
-2026-05-12T18:08:14.045 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_recommendations bound to exchange fire_updates with routing key support.recommendations
-2026-05-12T18:08:14.047 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_llm_propositions bound to exchange fire_updates with routing key support.llm.propositions
-2026-05-12T18:08:14.048 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-7ZTF0NJOGbsuJbugsE2tyQ consuming from simulation_recommendations has been registered
-2026-05-12T18:08:14.049 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-FvzGWYOdXam3lJ7YKwxkxg consuming from support_llm_propositions_responses has been registered
-2026-05-12T18:08:14.053 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-mi7MJuxal4utigMLe63ehg consuming from support_recommendations has been registered
-2026-05-12T18:08:14.053 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-O7kdHBu0J9kLrPLxc5beHA consuming from support_llm_propositions has been registered
-2026-05-12T18:08:15.377 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Attempting to connect to: [rabbitmq:5672]
-2026-05-12T18:08:15.402 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Created new connection: rabbitConnectionFactory#510da778:2/SimpleConnection@550cf3ec [delegate=amqp://guest@172.18.0.7:5672/, localPort=59678]
+2026-06-18T19:26:11.319 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Attempting to connect to: [rabbitmq:5672]
+2026-06-18T19:26:11.438 [INFO] [fire-backend] o.s.a.r.c.CachingConnectionFactory - Created new connection: rabbitConnectionFactory#3a5e2525:2/SimpleConnection@335176e1 [delegate=amqp://guest@172.18.0.7:5672/, localPort=50812]
+2026-06-18T19:26:11.724 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_pm2_5 bound to exchange fire_updates with routing key simulation.telemetry.sensors.pm2_5
+2026-06-18T19:26:11.746 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_map_sector_state bound to exchange fire_updates with routing key simulation.telemetry.map.sector_state
+2026-06-18T19:26:11.755 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-FgUJol7SqgseVKtTbsW4Tw consuming from simulation_telemetry_sensors_pm2_5 has been registered
+2026-06-18T19:26:11.758 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-SUhboDBUEEDpARRQKuJ8MA consuming from simulation_telemetry_map_sector_state has been registered
+2026-06-18T19:26:11.765 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_map_sector_state_fast bound to exchange fire_updates with routing key simulation.telemetry.map.sector_state_fast
+2026-06-18T19:26:11.775 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-qVpR13lI4oiGtL5ozlmajA consuming from simulation_telemetry_map_sector_state_fast has been registered
+2026-06-18T19:26:11.787 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_co2 bound to exchange fire_updates with routing key simulation.telemetry.sensors.co2
+2026-06-18T19:26:11.797 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-hwiy9sM5J70v5CnMCl8RTQ consuming from simulation_telemetry_sensors_co2 has been registered
+2026-06-18T19:26:11.824 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_camera bound to exchange fire_updates with routing key simulation.telemetry.sensors.camera
+2026-06-18T19:26:11.827 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_wind_speed bound to exchange fire_updates with routing key simulation.telemetry.sensors.wind_speed
+2026-06-18T19:26:11.834 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-dDQ3D91hMNXncHg9HB1qEg consuming from simulation_telemetry_sensors_camera has been registered
+2026-06-18T19:26:11.835 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-cSLPg-mfQncly6fBtlcI_A consuming from simulation_telemetry_sensors_wind_speed has been registered
+2026-06-18T19:26:11.846 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue backend_llm_responses bound to exchange fire_updates with routing key support.llm.responses
+2026-06-18T19:26:11.849 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_litter_moisture bound to exchange fire_updates with routing key simulation.telemetry.sensors.litter_moisture
+2026-06-18T19:26:11.853 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_wind_direction bound to exchange fire_updates with routing key simulation.telemetry.sensors.wind_direction
+2026-06-18T19:26:11.856 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-Z3bBy4aJLlARaeHNqqC1Uw consuming from backend_llm_responses has been registered
+2026-06-18T19:26:11.861 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-W_RdYqImRLGGtwwNaBAxWQ consuming from simulation_telemetry_sensors_litter_moisture has been registered
+2026-06-18T19:26:11.863 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-xkAjojJMYIvk-8f4KHNGZg consuming from simulation_telemetry_sensors_wind_direction has been registered
+2026-06-18T19:26:11.887 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_agents_fire_brigade_batch bound to exchange fire_updates with routing key simulation.telemetry.agents.fire_brigade_batch
+2026-06-18T19:26:11.896 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-gbX1NB9vYM91waJ-X7PKSw consuming from simulation_telemetry_agents_fire_brigade_batch has been registered
+2026-06-18T19:26:11.902 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_recommendations bound to exchange fire_updates with routing key support.recommendations
+2026-06-18T19:26:11.910 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue backend_llm_requests bound to exchange fire_updates with routing key support.llm.requests
+2026-06-18T19:26:11.914 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-XtFCAhoRjk0Wqw6N7-x9WA consuming from support_recommendations has been registered
+2026-06-18T19:26:11.924 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_llm_propositions bound to exchange fire_updates with routing key support.llm.propositions
+2026-06-18T19:26:11.927 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-B8qv938njKBM7PmigSoiQw consuming from backend_llm_requests has been registered
+2026-06-18T19:26:11.928 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_sensors_temp_humidity bound to exchange fire_updates with routing key simulation.telemetry.sensors.temp_humidity
+2026-06-18T19:26:11.935 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_telemetry_agents_forester_batch bound to exchange fire_updates with routing key simulation.telemetry.agents.forester_batch
+2026-06-18T19:26:11.936 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-F1CFLcfdmKDAJ54QlM59mg consuming from support_llm_propositions has been registered
+2026-06-18T19:26:11.945 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-RuobRI8hNGj_NW_tfmYAKw consuming from simulation_telemetry_sensors_temp_humidity has been registered
+2026-06-18T19:26:11.945 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue simulation_recommendations bound to exchange fire_updates with routing key simulation.recommendations
+2026-06-18T19:26:11.947 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-HnZiB0_kQ-BNXJoM5SeAsA consuming from simulation_telemetry_agents_forester_batch has been registered
+2026-06-18T19:26:11.947 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue backend_llm_responses bound to exchange fire_updates with routing key support.llm.responses
+2026-06-18T19:26:11.949 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue backend_llm_requests bound to exchange fire_updates with routing key support.llm.requests
+2026-06-18T19:26:11.956 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-wcHwxL87gAd9_oZ_l2RY7A consuming from simulation_recommendations has been registered
+2026-06-18T19:26:11.957 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_llm_propositions_responses bound to exchange fire_updates with routing key support.llm.propositions.responses
+2026-06-18T19:26:11.964 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_llm_propositions bound to exchange fire_updates with routing key support.llm.propositions
+2026-06-18T19:26:11.967 [INFO] [fire-backend] p.e.a.k.f.s.StateUpdatesService - Queue support_llm_propositions_responses bound to exchange fire_updates with routing key support.llm.propositions.responses
+2026-06-18T19:26:11.964 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-FIvFja64eoJBttKay_zsQA consuming from backend_llm_requests has been registered
+2026-06-18T19:26:11.964 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-qhvr1--b7YywX6dxUVG8ag consuming from backend_llm_responses has been registered
+2026-06-18T19:26:11.967 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-BmwFVr3CV89mNJzvltVw9A consuming from support_llm_propositions_responses has been registered
+2026-06-18T19:26:11.974 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-dmlVnmSa5wZUIABZTvB7tQ consuming from support_llm_propositions has been registered
+2026-06-18T19:26:11.977 [INFO] [fire-backend] reactor.rabbitmq.Receiver - Consumer amq.ctag-nA3Xuhsw-02HJGccgMyu7g consuming from support_llm_propositions_responses has been registered
+2026-06-18T19:27:03.897 [INFO] [fire-backend] p.e.a.k.f.s.SimulationStateService - Received recommendation message: 1 actions

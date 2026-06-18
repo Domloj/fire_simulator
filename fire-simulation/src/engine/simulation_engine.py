@@ -29,11 +29,9 @@ from src.messaging.rabbitmq_publisher import RabbitMQPublisher
 
 logger = logging.getLogger(__name__)
 
-# Progi, powyżej których odczyt sensora oznacza wykryty pożar. Baseline +
-# szum ich nie przebija; dopiero dorzut z płonącego sektora (sensors.py) tak.
-DETECT_CO2_PPM = 800.0     # baseline 400 ppm
-DETECT_PM25 = 100.0        # baseline 35 µg/m³
-DETECT_TEMP_C = 45.0       # baseline ~20 °C
+DETECT_CO2_PPM = 800.0
+DETECT_PM25 = 100.0
+DETECT_TEMP_C = 45.0
 
 
 @dataclass
@@ -42,32 +40,24 @@ class SimulationSnapshot:
     
     simulation_id: str
     tick: int
-    simulation_time: float  # Logical clock: tick * tick_interval (seconds)
+    simulation_time: float
     
-    # Map state (immutable)
     sectors: Dict[int, Sector] = field(default_factory=dict)
     
-    # Environment
     wind: Wind = field(default_factory=Wind)
     global_temperature: float = 20.0
     
-    # RNG state (for determinism)
     rng_state: Dict[str, Any] = field(default_factory=dict)
     
-    # Event audit trail
     events: EventQueue = field(default_factory=EventQueue)
     
     def clone(self) -> "SimulationSnapshot":
         """Create deep copy of snapshot."""
         return copy.deepcopy(self)
     
-    # Agents (mutated in place by AgentManager; snapshotted in engine.snapshot())
     agents: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        # rng_state contains numpy state tuples which aren't JSON-serializable;
-        # expose just the seed and call count for the snapshot endpoint.
         rng_summary = {
             "seed": self.rng_state.get("seed"),
             "call_count": self.rng_state.get("call_count"),
@@ -123,34 +113,21 @@ class SimulationEngine:
         self.tick_count = 0
         self.tick_interval = tick_interval
         
-        # Build sector adjacency map for 4-neighborhood (section 5.3)
         self._build_adjacency_map()
 
-        # Agent manager (spec section 4)
         self.agent_manager = agent_manager or AgentManager()
 
-        # Sensor array (spec section 5.2.2)
         self.sensor_array = SensorArray(rng=self.rng)
 
-        # RabbitMQ publisher (spec section 5.2)
         self.rabbitmq_publisher = RabbitMQPublisher()
 
-        # metrics tracker (ustawiany z zewnątrz przez EngineHost gdy experimentLog jest aktywny)
         self.metrics_tracker = None
 
-        # Wykrywanie pożaru (Krok 3): support dostaje stan sektora dopiero po
-        # jego wykryciu — przez sensor przekraczający próg albo patrol w pobliżu.
-        # Mapa operatora dalej widzi prawdę, bramkujemy tylko feed do FFSup.
-        # Gdy detection_enabled=False support znów ma pełną wiedzę (stare zachowanie).
         self.detection_enabled = True
         self._detected_sectors: set = set()
 
-        # Historia stanów do cofania kroku (sektory + agenci + RNG). Trzymana
-        # z ograniczeniem, żeby nie rosła w nieskończoność przy długim biegu.
         self._history: List[Dict[str, Any]] = []
         self.max_history = 1000
-
-        # Current state
         self.current_snapshot: Optional[SimulationSnapshot] = None
         self.last_events: List[AgentEvent] = []
     
@@ -159,23 +136,19 @@ class SimulationEngine:
         
         O(N) complexity using position_map for O(1) lookup.
         """
-        # Build position map (row, col) -> sector_id for O(1) lookup
         position_map: Dict[tuple, int] = {}
         for sector_id, sector in self.forest_map.items():
             position_map[(sector.row, sector.column)] = sector_id
         
-        # Build adjacency using O(1) lookups
         self.adjacency_map: Dict[int, List[Tuple[int, int]]] = {}
         
         for sector_id, sector in self.forest_map.items():
             neighbors = []
             
-            # Check all 4 directions: North, East, South, West
             for dr, dc in FirePropagation.DIRECTIONS:
                 neighbor_row = sector.row + dr
                 neighbor_col = sector.column + dc
                 
-                # O(1) lookup instead of O(N) search
                 if (neighbor_row, neighbor_col) in position_map:
                     neighbor_id = position_map[(neighbor_row, neighbor_col)]
                     neighbors.append((neighbor_id, (dr, dc)))
@@ -197,11 +170,9 @@ class SimulationEngine:
             self.rng = RngManager(seed=seed)
             self.fire_propagation.rng = self.rng
 
-        # Świeży przebieg: nic jeszcze nie wykryte, pusta historia cofania
         self._detected_sectors = set()
         self._history = []
 
-        # Create initial snapshot
         self.current_snapshot = SimulationSnapshot(
             simulation_id=self.simulation_id,
             tick=0,
@@ -222,10 +193,10 @@ class SimulationEngine:
         Lifecycle:
         1. Snapshot currentState -> previousState
         2. Propagacja pożaru
-        3. Aktualizacja agentów (TODO)
+        3. Aktualizacja agentów
         4. Aktualizacja środowiska
-        5. Generacja telemetrii (TODO)
-        6. Publikacja RabbitMQ (TODO)
+        5. Generacja telemetrii
+        6. Publikacja RabbitMQ
         7. Commit nextState
         
         Returns:
@@ -234,8 +205,6 @@ class SimulationEngine:
         if self.current_snapshot is None:
             raise RuntimeError("Simulation not initialized. Call initialize() first.")
 
-        # Zapis stanu sprzed tego kroku do historii cofania. Agentów kopiujemy
-        # zanim process_tick ich zmodyfikuje, a RNG jest już w snapshocie.
         self._history.append({
             "snapshot": self.current_snapshot.clone(),
             "agent_manager": copy.deepcopy(self.agent_manager),
@@ -244,13 +213,10 @@ class SimulationEngine:
         if len(self._history) > self.max_history:
             self._history.pop(0)
 
-        # Phase 1: Create immutable snapshot of previous state
         previous_snapshot = self.current_snapshot.clone()
         
-        # Phase 2: Fire propagation
         next_sectors = self._phase_fire_propagation(previous_snapshot)
 
-        # Phase 3: Agent updates (spec section 2.7 step 2)
         self.last_events = self.agent_manager.process_tick(
             next_sectors=next_sectors,
             previous_sectors=previous_snapshot.sectors,
@@ -261,13 +227,8 @@ class SimulationEngine:
                 if event.event_type == AgentEventType.BRIGADE_ARRIVED:
                     self.metrics_tracker.on_brigade_arrived(event.agent_id, self.tick_count + 1)
 
-        # Phase 4: Environment updates (random wind walk, spec section 3.4)
         next_wind, next_temperature = self._phase_environment_update(previous_snapshot)
         
-        # Phase 5: Telemetry generation (spec section 5.2)
-        # Milisekundy, nie mikrosekundy — backend mapuje timestamp na java.util.Date,
-        # które potrafi nie sparsować 6-cyfrowej części ułamkowej i po cichu odrzucić
-        # rekord agenta (pusty batch → brak ruchu kropek na mapie).
         timestamp = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
         telemetry_data = self._phase_telemetry_generation(
             next_sectors=next_sectors,
@@ -277,10 +238,8 @@ class SimulationEngine:
             timestamp=timestamp
         )
         
-        # Phase 6: RabbitMQ publication (spec section 5.2)
         self._phase_rabbitmq_publication(telemetry_data)
         
-        # Phase 7: Commit next state
         self.tick_count += 1
         self.current_snapshot = SimulationSnapshot(
             simulation_id=self.simulation_id,
@@ -310,7 +269,6 @@ class SimulationEngine:
         self._detected_sectors = record["detected"]
         self.tick_count = self.current_snapshot.tick
 
-        # Przywrócenie RNG, żeby ponowne kroki w przód były spójne ze stanem.
         try:
             self.rng.set_state(self.current_snapshot.rng_state)
             self.fire_propagation.rng = self.rng
@@ -350,19 +308,16 @@ class SimulationEngine:
         """
         next_sectors = {sid: s.clone() for sid, s in previous_snapshot.sectors.items()}
         
-        # Iterate over all burning sectors in previous state
         for sector_id, prev_sector in previous_snapshot.sectors.items():
             if not prev_sector.is_burning():
                 continue
             
             next_sector = next_sectors[sector_id]
             
-            # Attempt to spread fire to neighbors
             for neighbor_id, (dr, dc) in self.adjacency_map.get(sector_id, []):
                 neighbor_prev = previous_snapshot.sectors[neighbor_id]
                 neighbor_next = next_sectors[neighbor_id]
                 
-                # Check ignition probability
                 ignites = self.fire_propagation.attempt_ignition(
                     target_sector=neighbor_prev,
                     neighbor_sector=prev_sector,
@@ -375,16 +330,12 @@ class SimulationEngine:
                 )
                 
                 if ignites:
-                    # FSM validation: only ignite DORMANT sectors
                     if neighbor_next.is_flammable():
                         neighbor_next.state = SectorState.BURNING
-                        neighbor_next.fire_level = 0.1  # Initial fire level
+                        neighbor_next.fire_level = 0.1
                         if self.metrics_tracker:
                             self.metrics_tracker.on_ignition(neighbor_id, self.tick_count + 1)
-                    # else: log warning if trying to re-ignite already burning sector
             
-            # Update fire level per spec section 2.5.1 R3:
-            # ∆ℓ = spreadRate · k_sector (k_sector = flammability coefficient)
             sector_multiplier = prev_sector.get_flammability_coefficient()
 
             next_sector.fire_level = self.fire_propagation.update_fire_level(
@@ -392,18 +343,14 @@ class SimulationEngine:
                 sector_multiplier=sector_multiplier,
             )
             
-            # Consume fuel (section 6.3)
             next_sector.fuel = self.fire_propagation.update_fuel(prev_sector)
             
-            # Update burn level (tracking cumulative burning)
             next_sector.burn_level = self.fire_propagation.update_burn_level(prev_sector)
             
-            # Check burnout (section 6.4)
             if self.fire_propagation.check_burnout(next_sector):
                 next_sector.state = SectorState.ASH
                 next_sector.fire_level = 0.0
             
-            # Check extinguishment (spec section 2.5.1 R5: extinguishLevel ≥ ethr → Ext)
             if self.fire_propagation.check_extinguishment(next_sector):
                 next_sector.state = SectorState.EXTINGUISHED
                 next_sector.fire_level = 0.0
@@ -421,9 +368,8 @@ class SimulationEngine:
         """
         prev_wind = previous_snapshot.wind
 
-        # Small bounded random perturbations (spec: "w małych granicach")
-        speed_delta = self.rng.uniform(-1.0, 1.0)          # ±1 km/h per tick
-        direction_delta = self.rng.uniform(-5.0, 5.0)      # ±5° per tick
+        speed_delta = self.rng.uniform(-1.0, 1.0)
+        direction_delta = self.rng.uniform(-5.0, 5.0)
 
         new_speed = max(0.0, min(80.0, prev_wind.speed + speed_delta))
         new_direction = (prev_wind.direction_degrees + direction_delta) % 360.0
@@ -515,19 +461,13 @@ class SimulationEngine:
         """
         telemetry = {
             "sectors": [],
-            "sectors_fast": [],  # Only changed sectors
+            "sectors_fast": [],
             "sensors": [],
             "agents": [],
         }
         
-        # Odległość każdego sektora do najbliższego pożaru (BFS wieloźródłowy z
-        # palących się sektorów). Steruje poziomem zagrożenia, dzięki czemu
-        # ryzyko tworzy gradient wokół ognia zamiast jednolitej plamy.
         dist_to_fire = self._distances_to_fire(next_sectors)
 
-        # Sector state telemetry (spec 5.2.1).
-        # Silnik trzyma poziomy w skali 0-1, telemetria FFSup/FFVis oczekuje
-        # 0-100 (alpha na mapie, requiredBrigades = ceil(fireLevel/3)).
         for sector_id, sector in next_sectors.items():
             sector_telemetry = {
                 "sectorId": sector_id,
@@ -539,7 +479,6 @@ class SimulationEngine:
             }
             telemetry["sectors"].append(sector_telemetry)
             
-            # Fast variant: only if state changed
             prev_sector = previous_sectors[sector_id]
             if (prev_sector.fire_level != sector.fire_level or
                 prev_sector.burn_level != sector.burn_level or
@@ -547,8 +486,6 @@ class SimulationEngine:
                 prev_sector.state != sector.state):
                 telemetry["sectors_fast"].append(sector_telemetry)
         
-        # Sensor readings (spec 5.2.2). Odczyty rosną na płonących sektorach,
-        # dlatego podajemy aktualne poziomy ognia.
         sector_fire_levels = {sid: s.fire_level for sid, s in next_sectors.items()}
         sensor_readings = self.sensor_array.read_all(
             timestamp=timestamp,
@@ -560,18 +497,13 @@ class SimulationEngine:
         for reading in sensor_readings:
             telemetry["sensors"].append(reading.to_dict())
         
-        # Agent telemetry (spec 5.2.3)
         agents_dict = self.agent_manager.to_dict()
 
         def _loc(raw: Dict[str, Any]) -> Dict[str, float]:
-            # Agent trzyma lon/lat, ale backend i frontend (animacja kropek)
-            # czytają longitude/latitude. Dajemy oba klucze, żeby każdy odbiorca
-            # (support, backend, front) sparsował położenie.
             lon = raw.get("lon", raw.get("longitude", 0.0))
             lat = raw.get("lat", raw.get("latitude", 0.0))
             return {"longitude": lon, "latitude": lat, "lon": lon, "lat": lat}
 
-        # Fire brigades
         brigades = []
         for brigade_data in agents_dict.get("brigades", []):
             brigade_telemetry = {
@@ -587,8 +519,7 @@ class SimulationEngine:
             "type": "fire_brigades",
             "data": brigades
         })
-
-        # Foresters
+    
         foresters = []
         for forester_data in agents_dict.get("foresters", []):
             forester_telemetry = {
@@ -605,8 +536,6 @@ class SimulationEngine:
             "data": foresters
         })
 
-        # Aktualizacja wykrytych sektorów na podstawie sensorów i patroli.
-        # Wynik (self._detected_sectors) bramkuje feed do supportu.
         self._update_detection(next_sectors, sensor_readings, foresters)
 
         return telemetry
@@ -624,18 +553,15 @@ class SimulationEngine:
             logger.debug("RabbitMQ unavailable, skipping publication")
             return
         
-        # Publish full sector states (spec 5.2.1)
         for sector_data in telemetry_data.get("sectors", []):
             self.rabbitmq_publisher.publish_sector_state(sector_data)
         
-        # Publish fast sector states (only changed)
         for sector_data in telemetry_data.get("sectors_fast", []):
             self.rabbitmq_publisher.publish(
                 routing_key="simulation.telemetry.map.sector_state_fast",
                 message=sector_data
             )
         
-        # Publish sensor readings (spec 5.2.2)
         for sensor_reading in telemetry_data.get("sensors", []):
             self.rabbitmq_publisher.publish_sensor_reading(
                 sensor_type=sensor_reading.get("sensorType"),
@@ -645,27 +571,15 @@ class SimulationEngine:
                 timestamp=sensor_reading.get("timestamp")
             )
         
-        # Publish agent states (spec 5.2.3)
         for agent_batch in telemetry_data.get("agents", []):
             agent_type = agent_batch.get("type")
             agent_data = agent_batch.get("data", [])
-            
-            # Publikujemy tylko wariant zbiorczy (batch). Wcześniej każdy agent
-            # leciał dodatkowo osobną wiadomością na własną kolejkę, a backend
-            # konsumował obie równolegle. Dwie kolejki czytane z dwóch wątków
-            # nie mają gwarancji kolejności, więc spóźniona pojedyncza wiadomość
-            # nadpisywała nowszą pozycję z batcha i agent "teleportował się".
-            # Jedna kolejka batch = FIFO z RabbitMQ, brak wyścigu.
             if agent_type == "fire_brigades":
                 self.rabbitmq_publisher.publish_fire_brigade_batch(agent_data)
 
             elif agent_type == "foresters":
                 self.rabbitmq_publisher.publish_forester_batch(agent_data)
 
-        # Feed dla FFSup: support konsumuje zagregowany stan na routing key
-        # support.data.aggregated oraz pozycje agentów na agent_position.
-        # Backend tego nie agreguje (robi to tylko dla frontendu przez SSE),
-        # więc źródłem danych dla supportu jest bezpośrednio symulator.
         self._publish_support_feed(telemetry_data)
 
     def _distances_to_fire(self, sectors: Dict[int, Sector], max_dist: int = 3) -> Dict[int, int]:
@@ -721,11 +635,9 @@ class SimulationEngine:
         supportowi do końca przebiegu, nawet gdy ogień przygaśnie.
         """
         if not self.detection_enabled:
-            # support widzi wszystko (jak przed dołożeniem wykrywania)
             self._detected_sectors = set(next_sectors.keys())
             return
 
-        # sektory obserwowane przez patrole: bieżący sektor patrolu + sąsiedzi
         patrol_observed: set = set()
         for f in foresters:
             sid = f.get("sectorId")
@@ -735,11 +647,6 @@ class SimulationEngine:
             for neighbor_id, _ in self.adjacency_map.get(sid, []):
                 patrol_observed.add(neighbor_id)
 
-        # sektory obserwowane przez czujniki: ten, na którym sensor przebił próg,
-        # oraz jego sąsiedzi. Dym i podwyższone stężenia gazów rozchodzą się na
-        # pobliskie sektory, więc czujnik na sąsiednim sektorze również potwierdza
-        # pożar. Bez tego ogień musiałby dorosnąć dokładnie pod czujnikiem, żeby
-        # support go zobaczył, przez co detekcja startowała z dużym opóźnieniem.
         sensor_observed: set = set()
         for reading in sensor_readings:
             if reading.sector_id is not None and self._sensor_trips(reading):
@@ -769,9 +676,6 @@ class SimulationEngine:
         """
         message: Dict[str, Any] = {}
 
-        # Bramkowanie wykrywaniem: sektory jeszcze niewykryte raportujemy
-        # supportowi jako spokojne (DORMANT, zero ognia), więc MCTS nie wysyła
-        # tam brygad zanim pożar nie zostanie zauważony przez sensor lub patrol.
         detected = self._detected_sectors
         support_sectors = []
         for s in telemetry_data.get("sectors", []):

@@ -82,8 +82,6 @@ class RabbitMQPublisher:
             )
             self.channel = self.connection.channel()
             
-            # Declare exchange (idempotent). durable=False musi zgadzać się z
-            # deklaracją backendu (FFSup), inaczej broker odrzuca redeklarację.
             self.channel.exchange_declare(
                 exchange=self.EXCHANGE_NAME,
                 exchange_type=self.EXCHANGE_TYPE,
@@ -122,7 +120,7 @@ class RabbitMQPublisher:
                 body=body,
                 properties=pika.BasicProperties(
                     content_type="application/json",
-                    delivery_mode=2,  # Persistent
+                    delivery_mode=2,
                 )
             )
             logger.debug("Published to %s: %d bytes", routing_key, len(body))
@@ -181,7 +179,7 @@ class RabbitMQPublisher:
             True if published
         """
         if not changed_sectors:
-            return True  # Nothing to publish
+            return True
         
         for sector_data in changed_sectors:
             self.publish(
@@ -212,7 +210,6 @@ class RabbitMQPublisher:
         if not timestamp:
             timestamp = datetime.utcnow().isoformat() + "Z"
         
-        # Map sensor type to routing key suffix
         routing_key_map = {
             "WIND_SPEED": "simulation.telemetry.sensors.wind_speed",
             "WIND_DIRECTION": "simulation.telemetry.sensors.wind_direction",
@@ -291,8 +288,6 @@ class RabbitMQPublisher:
         if not brigades_data:
             return True
 
-        # Backend deserializuje to do EvFireBrigadeBatch(List batch) — pole musi
-        # nazywać się "batch", inaczej dostaje null i nie emituje pozycji agentów.
         message = {"batch": brigades_data}
 
         return self.publish(
@@ -353,7 +348,6 @@ class RabbitMQPublisher:
         if not foresters_data:
             return True
 
-        # Backend oczekuje pola "batch" (EvForesterPatrolBatch(List batch)).
         message = {"batch": foresters_data}
 
         return self.publish(

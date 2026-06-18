@@ -2,16 +2,16 @@
 Fire propagation model for FFSim according to spec section 6.
 
 Core formula for ignition probability (section 6.1):
-p_ign = clamp(0, 1, f(1-m)(1+α|w|cosθ) * ℓ_neighbor * (1+β(T-T_ref)))
+p_ign = clamp(0, 1, f(1-m)(1+alpha|w|cosθ) * l_neighbor * (1+beta(T-T_ref)))
 
 Where:
 - f: fuel amount [0,1]
 - m: moisture [0,1]
 - w: wind speed and direction
 - θ: angle between wind direction and sector
-- ℓ_neighbor: fire intensity of burning neighbor
+- l_neighbor: fire intensity of burning neighbor
 - T: temperature
-- α, β: coefficients (tunable)
+- alpha, beta: coefficients (tunable)      
 - T_ref: reference temperature
 """
 
@@ -26,8 +26,8 @@ from src.engine.models.sector import Sector, SectorState
 class Wind:
     """Global wind state (section 7.1)."""
     
-    speed: float = 0.0           # m/s or normalized [0, 1]
-    direction_degrees: float = 0.0  # 0-360, where 0=North, 90=East, etc.
+    speed: float = 0.0
+    direction_degrees: float = 0.0
     
     def get_direction_radians(self) -> float:
         """Convert direction to radians."""
@@ -48,57 +48,34 @@ class Wind:
 class FirePropagationConfig:
     """Configuration for fire propagation parameters."""
 
-    # p_ign coefficients per spec section 7 (parametry konfiguracyjne silnika)
-    alpha_wind: float = 0.01          # windAlpha — wind influence coefficient (|w| in km/h)
-    beta_temperature: float = 0.02    # betaTemperature — temperature coefficient
-
-    # Globalny współczynnik rozprzestrzeniania. Bez niego, przy moisture=0 i
-    # sąsiedzie palącym się pełnym ogniem, p_ign wychodzi 1.0 — czyli ogień
-    # zajmuje każdego sąsiada deterministycznie i rośnie wykładniczo (cała
-    # siatka w ~20 ticków, nie do opanowania). 0.2 czyni zapłon stochastycznym
-    # i stopniowym, więc straż ma szansę powstrzymać front.
+    alpha_wind: float = 0.01
+    beta_temperature: float = 0.02
     spread_probability: float = 0.2
 
-    # Reference values
-    reference_temperature: float = 20.0  # °C
+    reference_temperature: float = 20.0
 
-    # Ignition (spec section 7: ignitionBase = 0.10)
-    ignition_base: float = 0.10       # Initial fireLevel of a newly ignited sector (ℓ₀)
+    ignition_base: float = 0.10
+    spread_rate: float = 0.04
+    wind_multiplier_max: float = 2.0
 
-    # Fire growth (section 2.4.2 R3)
-    # 0.04 rozkłada eskalację równo na stopnie 1-4 (~6 ticków każdy); przy 0.10
-    # sektor przeskakiwał do EXTREME w ~7 ticków i niższe stopnie były niewidoczne.
-    spread_rate: float = 0.04         # Base spread rate per tick
-    wind_multiplier_max: float = 2.0  # Max wind effect multiplier
-
-    # Fuel consumption (section 2.4.2 R3)
-    # Rates per fire classification level (ISD2024):
-    #   level 1 (EARLY_FIRE):   0.5 units/step  → relative multiplier 0.5
-    #   level 2 (MEDIUM_FIRE):  1.0 units/step  → baseline multiplier 1.0
-    #   level 3 (FULL_FIRE):    2.0 units/step  → multiplier 2.0
-    #   level 4 (EXTREME_FIRE): 4.0 units/step  → multiplier 4.0
-    # fuel_consumption_rate is the base (level-2 / MEDIUM_FIRE) rate [0,1]/tick.
     fuel_consumption_rate: float = 0.02
-    fuel_consumption_multiplier: dict = None   # set in __post_init__
+    fuel_consumption_multiplier: dict = None
 
-    # Extinguishing (section 2.4.2 R5)
-    extinguish_threshold: float = 1.0    # When extinguish_level >= 1, sector is extinguished
+    extinguish_threshold: float = 1.0
 
     def __post_init__(self):
         if self.fuel_consumption_multiplier is None:
-            # Keys are fire classification levels 1-4 (ISD2024)
             object.__setattr__(self, 'fuel_consumption_multiplier', {
-                1: 0.5,   # EARLY_FIRE   — manageable by one engine
-                2: 1.0,   # MEDIUM_FIRE  — baseline = fuel_consumption_rate
-                3: 2.0,   # FULL_FIRE    — requires maximum crews
-                4: 4.0,   # EXTREME_FIRE — exceeds local capabilities
+                1: 0.5,   # EARLY_FIRE   - manageable by one engine
+                2: 1.0,   # MEDIUM_FIRE  - baseline = fuel_consumption_rate
+                3: 2.0,   # FULL_FIRE    - requires maximum crews
+                4: 4.0,   # EXTREME_FIRE - exceeds local capabilities
             })
 
 
 class FirePropagation:
     """Fire propagation engine."""
     
-    # Cardinal directions: North, East, South, West (4-neighborhood, section 5.3)
     DIRECTIONS = [
         (-1, 0),  # North (up)
         (0, 1),   # East (right)
@@ -109,7 +86,6 @@ class FirePropagation:
     DIRECTION_NAMES = ["North", "East", "South", "West"]
     DIRECTION_DEGREES = [0, 90, 180, 270]  # North, East, South, West
     
-    # Epsilon for floating-point comparisons (prevents fuel never reaching exactly 0)
     EPSILON = 1e-6
     
     def __init__(self, rng: RngManager, config: Optional[FirePropagationConfig] = None):
@@ -131,7 +107,7 @@ class FirePropagation:
                                    to_col: int) -> float:
         """
         Wind component per spec section 2.4.1:
-            wind_component = 1 + α · |w| · cosθ
+            wind_component = 1 + alpha * |w| * cosθ
         where |w| is wind speed in km/h (no normalisation per spec).
         """
         dr = to_row - from_row
@@ -165,15 +141,15 @@ class FirePropagation:
 
         Canonical formula:
             p_ign = clamp(0, 1,
-                f · (1−m)
-                · (1 + α · ‖w‖_norm · cosθ)
-                · ℓ_neighbor
-                · max(0, 1 + β·(T − T_ref))
+                f * (1-m)
+                * (1 + alpha * |w|_norm * cosθ)
+                * l_neighbor
+                * max(0, 1 + beta * (T - T_ref))
             )
 
         Args:
             target_sector:    Sector that might catch fire (provides f, m, T)
-            neighbor_sector:  Burning neighbour (provides ℓ_neighbor)
+            neighbor_sector:  Burning neighbour (provides l_neighbor)
             wind:             Global wind state (speed in km/h, normalised internally)
             from_row/col:     Burning sector coordinates
             to_row/col:       Target sector coordinates
@@ -182,36 +158,27 @@ class FirePropagation:
         Returns:
             Ignition probability in [0, 1]
         """
-        # Pre-conditions
         if not target_sector.is_flammable():
             return 0.0
         
         if not neighbor_sector.is_burning():
             return 0.0
         
-        # Component 1: Fuel and moisture
         fuel_moisture_factor = target_sector.fuel * (1.0 - target_sector.moisture)
-        
-        # Component 2: Wind effect (already includes 1 + α|w|cosθ)
         wind_component = self.calculate_wind_angle_factor(wind, from_row, from_col, to_row, to_col)
         
-        # Component 3: Neighbor fire intensity
         neighbor_fire_factor = neighbor_sector.fire_level
         
-        # Component 4: Temperature effect
         temp_diff = global_temperature - self.config.reference_temperature
         temperature_component = 1.0 + self.config.beta_temperature * temp_diff
-        # IMPORTANT: Clamp to prevent negative probability at low temperatures
         temperature_component = max(0.0, temperature_component)
         
-        # Combine all factors (z globalnym współczynnikiem rozprzestrzeniania)
         p_ignition = (self.config.spread_probability *
                      fuel_moisture_factor *
                      wind_component *
                      neighbor_fire_factor *
                      temperature_component)
 
-        # Clamp to [0, 1]
         return max(0.0, min(1.0, p_ignition))
     
     def attempt_ignition(self,
@@ -238,7 +205,6 @@ class FirePropagation:
             global_temperature
         )
         
-        # Use RNG for deterministic randomness
         return self.rng.random() < p_ign
     
     def update_fire_level(self,
@@ -247,7 +213,7 @@ class FirePropagation:
         """
         Update fire level per tick (section 6.2).
         
-        ℓ_t+1 = ℓ_t + spreadRate * sectorMultiplier
+        l_t+1 = l_t + spreadRate * sectorMultiplier
         (Wind effects already captured in ignition probability)
         
         Args:
@@ -260,10 +226,8 @@ class FirePropagation:
         if not sector.is_burning():
             return sector.fire_level
         
-        # Base spread rate (wind effects in ignition, not fire level growth)
         fire_add = self.config.spread_rate * sector_multiplier
         
-        # Update fire level
         new_fire_level = sector.fire_level + fire_add
         new_fire_level = max(0.0, min(1.0, new_fire_level))
         
@@ -274,12 +238,12 @@ class FirePropagation:
         Consume fuel per tick using level-dependent rates (article ISD2024).
 
         Rates per fire classification level:
-            level 1 (EARLY_FIRE):   fuel_consumption_rate × 0.5
-            level 2 (MEDIUM_FIRE):  fuel_consumption_rate × 1.0  (baseline)
-            level 3 (FULL_FIRE):    fuel_consumption_rate × 2.0
-            level 4 (EXTREME_FIRE): fuel_consumption_rate × 4.0
+            level 1 (EARLY_FIRE):   fuel_consumption_rate * 0.5
+            level 2 (MEDIUM_FIRE):  fuel_consumption_rate * 1.0  (baseline)
+            level 3 (FULL_FIRE):    fuel_consumption_rate * 2.0
+            level 4 (EXTREME_FIRE): fuel_consumption_rate * 4.0
 
-        f_{t+1} = f_t − fuel_consumption_rate × level_multiplier
+        f_{t+1} = f_t - fuel_consumption_rate * level_multiplier
 
         Args:
             sector: Sector to update
@@ -311,7 +275,6 @@ class FirePropagation:
         if not sector.is_burning():
             return sector.burn_level
         
-        # Accumulate burn level
         new_burn_level = sector.burn_level + sector.fire_level * 0.1
         new_burn_level = max(0.0, min(1.0, new_burn_level))
         
